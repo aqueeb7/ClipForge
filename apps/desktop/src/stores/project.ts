@@ -725,8 +725,12 @@ export const useProjectStore = defineStore("project", {
         }
 
         if (proj.clipSettings.mode === "automatic") {
-          this.masterInSeconds = proj.clipSettings.startSeconds;
-          this.masterOutSeconds = proj.clipSettings.endSeconds;
+          this.masterInSeconds = proj.clipSettings.startSeconds ?? 0;
+          this.masterOutSeconds =
+            proj.clipSettings.endSeconds ??
+            this.videoMetadata?.durationSeconds ??
+            proj.sources.video?.durationSeconds ??
+            60;
         }
 
         this.divideIntoParts();
