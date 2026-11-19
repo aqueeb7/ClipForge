@@ -1,0 +1,57 @@
+{
+  "id": "proj_gta6_basic",
+  "name": "GTA VI Gameplay",
+  "version": 1,
+  "sources": {
+    "video": {
+      "path": "./gameplay.mp4",
+      "durationSeconds": 300,
+      "width": 1920,
+      "height": 1080
+    }
+  },
+  "synchronization": {
+    "audioOffsetMs": 0
+  },
+  "clipSettings": {
+    "mode": "automatic",
+    "startSeconds": 0,
+    "endSeconds": 300,
+    "durationSeconds": 60,
+    "overlapSeconds": 0,
+    "minimumFinalClipSeconds": 5,
+    "startingEpisode": 1
+  },
+  "composition": {
+    "width": 1080,
+    "height": 1920,
+    "background": {
+      "mode": "blur",
+      "blurRadius": 25,
+      "color": "#000000"
+    },
+    "gameplay": {
+      "mode": "contain",
+      "scale": 1,
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    "overlay": {
+      "enabled": true,
+      "brandTitle": "CLIPFORGE",
+      "episodeLabel": "PART",
+      "showEpisodeNumber": true
+    }
+  },
+  "export": {
+    "container": "mp4",
+    "videoCodec": "h264",
+    "audioCodec": "aac",
+    "frameRate": 60,
+    "crf": 21,
+    "preset": "veryfast",
+    "outputDirectory": "./Exports/GTA6_Gameplay",
+    "namingPattern": "{project}_{episode}_{title}",
+    "structure": "flat"
+  }
+}

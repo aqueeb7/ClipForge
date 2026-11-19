@@ -1,0 +1,18 @@
+{
+  "name": "@clipforge/media",
+  "version": "0.1.0",
+  "description": "Media inspection, FFmpeg/FFprobe wrappers, and environment diagnostics for ClipForge",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc --build",
+    "clean": "rimraf dist tsconfig.tsbuildinfo",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@clipforge/core": "0.1.0",
+    "@clipforge/shared": "0.1.0",
+    "@ffprobe-installer/ffprobe": "^2.1.2"
+  }
+}

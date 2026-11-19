@@ -1,0 +1,33 @@
+{
+  "name": "clipforge",
+  "version": "0.1.0",
+  "description": "Local-first video production engine for converting long-form gameplay into vertical clips",
+  "private": true,
+  "author": "ClipForge Team",
+  "license": "MIT",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "clean": "npm run clean --workspaces",
+    "typecheck": "tsc --build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit",
+    "doctor": "node packages/cli/dist/index.js doctor",
+    "dev": "npm --workspace=@clipforge/desktop run dev",
+    "dev:desktop": "npm --workspace=@clipforge/desktop run dev",
+    "tauri:dev": "npm --workspace=@clipforge/desktop run tauri dev",
+    "tauri:build": "npm --workspace=@clipforge/desktop run tauri build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "rimraf": "^6.0.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "id": "proj_gta6_manual",
+  "name": "GTA VI Missions",
+  "version": 1,
+  "sources": {
+    "video": {
+      "path": "./gameplay.mp4",
+      "durationSeconds": 300,
+      "width": 1920,
+      "height": 1080
+    },
+    "audio": {
+      "path": "./commentary.wav",
+      "durationSeconds": 305
+    }
+  },
+  "synchronization": {
+    "audioOffsetMs": 1250
+  },
+  "clipSettings": {
+    "mode": "manual",
+    "clips": [
+      {
+        "title": "First mission",
+        "start": 12.5,
+        "end": 73.2,
+        "enabled": true
+      },
+      {
+        "title": "Police chase",
+        "start": 105.0,
+        "end": 164.5,
+        "enabled": true
+      },
+      {
+        "title": "Car escape",
+        "start": 230.0,
+        "end": 290.0,
+        "enabled": true
+      }
+    ]
+  },
+  "composition": {
+    "width": 1080,
+    "height": 1920,
+    "background": {
+      "mode": "blur",
+      "blurRadius": 25,
+      "color": "#000000"
+    },
+    "gameplay": {
+      "mode": "contain",
+      "scale": 1,
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    "overlay": {
+      "enabled": true,
+      "brandTitle": "CLIPFORGE",
+      "episodeLabel": "PART",
+      "showEpisodeNumber": true
+    }
+  },
+  "export": {
+    "container": "mp4",
+    "videoCodec": "h264",
+    "audioCodec": "aac",
+    "frameRate": 60,
+    "crf": 21,
+    "preset": "veryfast",
+    "outputDirectory": "./Exports/GTA6_Missions",
+    "namingPattern": "{project}_{episode}_{title}",
+    "structure": "nested"
+  }
+}
