@@ -1,0 +1,198 @@
+export type BackgroundMode = "blur" | "solid" | "none";
+export type GameplayFitMode = "contain" | "cover" | "crop" | "stretch";
+export type ClipMode = "automatic" | "manual";
+export type ExportContainer = "mp4" | "mov" | "mkv";
+export type VideoCodec = "h264" | "hevc" | "vp9";
+export type AudioCodec = "aac" | "mp3" | "opus";
+export type VideoPreset = "ultrafast" | "superfast" | "veryfast" | "faster" | "fast" | "medium" | "slow" | "slower" | "veryslow";
+export type ExportStructure = "flat" | "dated" | "by-clip" | "nested";
+
+export interface BackgroundSettings {
+  mode: BackgroundMode;
+  blurRadius?: number;
+  color?: string;
+}
+
+export interface GameplaySettings {
+  mode: GameplayFitMode;
+  scale?: number;
+  offsetX?: number;
+  offsetY?: number;
+}
+
+export interface OverlaySettings {
+  enabled: boolean;
+  brandTitle?: string;
+  episodeLabel?: string;
+  showEpisodeNumber?: boolean;
+}
+
+export interface CompositionSettings {
+  width: number;
+  height: number;
+  background: BackgroundSettings;
+  gameplay: GameplaySettings;
+  overlay: OverlaySettings;
+}
+
+export interface MediaSource {
+  path: string;
+  durationSeconds: number;
+  width?: number;
+  height?: number;
+}
+
+export interface ProjectSources {
+  video: MediaSource;
+  audio?: MediaSource;
+}
+
+export interface SynchronizationSettings {
+  audioOffsetMs: number;
+}
+
+export interface AutomaticClipSettings {
+  mode: "automatic";
+  startSeconds: number;
+  endSeconds?: number;
+  durationSeconds: number;
+  overlapSeconds: number;
+  minimumFinalClipSeconds: number;
+  startingEpisode: number;
+}
+
+export interface ManualClipItem {
+  start: number;
+  end: number;
+  title?: string;
+  enabled?: boolean;
+}
+
+export interface ManualClipSettings {
+  mode: "manual";
+  clips: ManualClipItem[];
+}
+
+export type ClipSettings = AutomaticClipSettings | ManualClipSettings;
+
+export interface ExportSettings {
+  container: ExportContainer;
+  videoCodec: VideoCodec;
+  audioCodec: AudioCodec;
+  frameRate: number;
+  crf: number;
+  preset: VideoPreset;
+  outputDirectory: string;
+  namingPattern: string;
+  structure: ExportStructure;
+}
+
+export interface ClipForgeProject {
+  id: string;
+  name: string;
+  version: 1;
+  sources: ProjectSources;
+  synchronization: SynchronizationSettings;
+  clipSettings: ClipSettings;
+  composition: CompositionSettings;
+  export: ExportSettings;
+}
+
+export interface Clip {
+  id: string;
+  index: number;
+  title: string;
+  sourceStartSeconds: number;
+  sourceEndSeconds: number;
+  enabled: boolean;
+  outputName: string;
+  status: "pending" | "rendering" | "completed" | "failed";
+  progress?: number;
+  error?: string;
+}
+
+export interface ClipManifest {
+  projectId: string;
+  projectName: string;
+  totalClips: number;
+  generatedAt: string;
+  clips: Clip[];
+}
+
+export interface StreamSummary {
+  path: string;
+  durationSeconds: number;
+  duration_seconds?: number;
+  width?: number;
+  height?: number;
+  fps?: number;
+  codec: string;
+  hasAudio: boolean;
+  has_audio?: boolean;
+  aspectRatio: string;
+  aspect_ratio?: string;
+  format?: string;
+}
+
+export type MediaMetadata = StreamSummary;
+
+export interface GpuEncoderInfo {
+  encoder: string;
+  name: string;
+  is_hardware: boolean;
+  description: string;
+}
+
+export interface AppDiagnostic {
+  ready: bool_or_boolean;
+  os: string;
+  message: string;
+  ffmpeg_found: bool_or_boolean;
+  ffprobe_found: bool_or_boolean;
+  gpu?: GpuEncoderInfo;
+}
+
+type bool_or_boolean = boolean;
+
+export interface RenderClipRequest {
+  clip_id?: string;
+  video_path: string;
+  audio_path?: string;
+  audio_offset_ms?: number;
+  start_seconds: number;
+  duration_seconds: number;
+  output_path: string;
+  mode: string;
+  bg_color?: string;
+  crf?: number;
+  preset?: string;
+  overlay_enabled?: boolean;
+  brand_title?: string;
+  episode_label?: string;
+  episode_index?: number;
+}
+
+export interface RenderProgressPayload {
+  clip_id?: string;
+  output_path: string;
+  progress: number;
+  fps: number;
+  speed: string;
+  eta_seconds?: number;
+}
+
+export interface RenderClipResponse {
+  success: boolean;
+  output_path: string;
+  duration_seconds: number;
+  file_size_bytes: number;
+  error?: string;
+}
+
+export const DEFAULT_CANVAS_WIDTH = 1080;
+export const DEFAULT_CANVAS_HEIGHT = 1920;
+export const DEFAULT_CLIP_DURATION = 60;
+export const DEFAULT_FRAME_RATE = 60;
+export const DEFAULT_VIDEO_CRF = 21;
+export const DEFAULT_PRESET: VideoPreset = "veryfast";
+export const DEFAULT_NAMING_PATTERN = "{project}_{episode}";

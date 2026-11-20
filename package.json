@@ -7,27 +7,37 @@
   "license": "MIT",
   "type": "module",
   "workspaces": [
-    "packages/*",
-    "apps/*"
+    "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
-    "clean": "npm run clean --workspaces",
-    "typecheck": "tsc --build",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "lint": "tsc --noEmit",
-    "doctor": "node packages/cli/dist/index.js doctor",
-    "dev": "npm --workspace=@clipforge/desktop run dev",
-    "dev:desktop": "npm --workspace=@clipforge/desktop run dev",
-    "tauri:dev": "npm --workspace=@clipforge/desktop run tauri dev",
-    "tauri:build": "npm --workspace=@clipforge/desktop run tauri build"
+    "clean": "rimraf dist src-tauri/target"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.1.1",
+    "@tauri-apps/plugin-dialog": "^2.0.1",
+    "@tauri-apps/plugin-fs": "^2.0.1",
+    "lucide-solid": "^1.76.0",
+    "solid-js": "^1.9.19",
+    "vite-plugin-solid": "^2.11.17"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.1.0",
     "@types/node": "^22.9.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
     "rimraf": "^6.0.1",
+    "tailwindcss": "^3.4.15",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
+    "vite": "^5.4.11",
     "vitest": "^2.1.4"
   }
 }
