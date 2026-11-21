@@ -400,6 +400,240 @@ export function planProjectClips(project: ClipForgeProject): ClipManifest {
   return generateClipManifest(project);
 }
 
+/**
+ * Reveals and highlights the specific file in Windows Explorer, macOS Finder, or Linux file manager.
+ */
+export async function highlightInFolder(filePath: string): Promise<void> {
+  if (isTauriEnvironment()) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("highlight_in_folder", { path: filePath });
+      return;
+    } catch (err) {
+      console.warn("highlight_in_folder failed, falling back to open_in_explorer:", err);
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("open_in_explorer", { path: filePath });
+      return;
+    }
+  }
+  console.log("Mock highlight in folder:", filePath);
+}
+
+/**
+ * Opens a URL in the user's default web browser.
+ */
+export async function openBrowserUrl(url: string): Promise<void> {
+  if (isTauriEnvironment()) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("open_browser_url", { url });
+      return;
+    } catch (err) {
+      console.warn("open_browser_url failed, falling back to window.open:", err);
+    }
+  }
+  window.open(url, "_blank");
+}
+
+/**
+ * Starts a temporary local loopback HTTP listener to catch the Google OAuth callback.
+ */
+export async function listenForOAuthCode(port: number = 8085): Promise<string> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<string>("listen_for_oauth_code", { port });
+  }
+  throw new Error("OAuth listener is only supported in native desktop mode");
+}
+
+/**
+ * Exchanges Google OAuth authorization code for access and refresh tokens.
+ */
+export async function exchangeOAuthCode(
+  clientId: string,
+  clientSecret: string,
+  code: string,
+  redirectUri: string
+): Promise<{
+  access_token: string;
+  refresh_token?: string;
+  expires_in?: number;
+  token_type?: string;
+}> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const jsonStr = await invoke<string>("exchange_oauth_code", {
+      clientId,
+      clientSecret,
+      code,
+      redirectUri,
+    });
+    return JSON.parse(jsonStr);
+  }
+  throw new Error("OAuth token exchange is only supported in native desktop mode");
+}
+
+/**
+ * Refreshes Google OAuth access token using stored refresh token.
+ */
+export async function refreshOAuthToken(
+  clientId: string,
+  clientSecret: string,
+  refreshToken: string
+): Promise<{
+  access_token: string;
+  expires_in?: number;
+  token_type?: string;
+}> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const jsonStr = await invoke<string>("refresh_oauth_token", {
+      clientId,
+      clientSecret,
+      refreshToken,
+    });
+    return JSON.parse(jsonStr);
+  }
+  throw new Error("OAuth token refresh is only supported in native desktop mode");
+}
+
+/**
+ * Uploads a rendered clip directly to YouTube via resumable upload.
+ */
+export async function uploadToYouTube(params: {
+  filePath: string;
+  title: string;
+  description: string;
+  tags: string[];
+  privacy: "public" | "unlisted" | "private";
+  accessToken: string;
+}): Promise<{
+  success: boolean;
+  video_id?: string;
+  url?: string;
+  error?: string;
+}> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<{
+      success: boolean;
+      video_id?: string;
+      url?: string;
+      error?: string;
+    }>("upload_to_youtube", {
+      params: {
+        file_path: params.filePath,
+        title: params.title,
+        description: params.description,
+        tags: params.tags,
+        privacy: params.privacy,
+        access_token: params.accessToken,
+      },
+    });
+  }
+  return {
+    success: true,
+    video_id: "mock_yt_12345",
+    url: "https://youtube.com/shorts/mock_yt_12345",
+  };
+}
+
+/**
+ * Cancels any active OAuth local listener.
+ */
+export async function cancelOAuthListener(): Promise<void> {
+  if (isTauriEnvironment()) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("cancel_oauth_listener");
+    } catch (err) {
+      console.warn("Failed to cancel OAuth listener:", err);
+    }
+  }
+}
+
+/**
+ * Saves Google OAuth client credentials securely to .credentials/youtube-secrets.json.
+ */
+export async function saveStoredSecrets(clientId: string, clientSecret: string): Promise<void> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("save_stored_secrets", { clientId, clientSecret });
+    return;
+  }
+  if (typeof localStorage !== "undefined") {
+    localStorage.setItem("clipforge_yt_secrets", JSON.stringify({ client_id: clientId, client_secret: clientSecret }));
+  }
+}
+
+/**
+ * Loads stored Google OAuth client credentials from .credentials/youtube-secrets.json.
+ */
+export async function loadStoredSecrets(): Promise<{ client_id: string; client_secret: string } | null> {
+  if (isTauriEnvironment()) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      return await invoke<{ client_id: string; client_secret: string } | null>("load_stored_secrets");
+    } catch (err) {
+      console.warn("Failed to load stored secrets:", err);
+    }
+  }
+  if (typeof localStorage !== "undefined") {
+    const raw = localStorage.getItem("clipforge_yt_secrets");
+    return raw ? JSON.parse(raw) : null;
+  }
+  return null;
+}
+
+/**
+ * Saves OAuth tokens securely to .credentials/youtube-tokens.json.
+ */
+export async function saveStoredTokens(tokensJson: string): Promise<void> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("save_stored_tokens", { tokensJson });
+    return;
+  }
+  if (typeof localStorage !== "undefined") {
+    localStorage.setItem("clipforge:youtube_tokens", tokensJson);
+  }
+}
+
+/**
+ * Loads OAuth tokens from .credentials/youtube-tokens.json.
+ */
+export async function loadStoredTokens(): Promise<string | null> {
+  if (isTauriEnvironment()) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      return await invoke<string | null>("load_stored_tokens");
+    } catch (err) {
+      console.warn("Failed to load stored tokens:", err);
+    }
+  }
+  if (typeof localStorage !== "undefined") {
+    return localStorage.getItem("clipforge:youtube_tokens");
+  }
+  return null;
+}
+
+/**
+ * Clears stored OAuth tokens from disk and memory.
+ */
+export async function clearStoredCredentials(): Promise<void> {
+  if (isTauriEnvironment()) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("clear_stored_credentials");
+    } catch (err) {
+      console.warn("Failed to clear stored credentials:", err);
+    }
+  }
+  if (typeof localStorage !== "undefined") {
+    localStorage.removeItem("clipforge:youtube_tokens");
+  }
+}
+
 export {
   coreAddManualClip,
   coreRemoveManualClip,

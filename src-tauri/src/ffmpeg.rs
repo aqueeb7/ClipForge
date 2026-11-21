@@ -17,23 +17,52 @@ pub fn escape_drawtext(s: &str) -> String {
 }
 
 pub fn resolve_project_path(p: &str) -> std::path::PathBuf {
-    let path = std::path::Path::new(p);
-    if path.is_absolute() {
+    let trimmed = p.trim();
+    #[cfg(target_os = "windows")]
+    let normalized = trimmed.replace('/', "\\");
+    #[cfg(not(target_os = "windows"))]
+    let normalized = trimmed.replace('\\', "/");
+
+    let path = std::path::Path::new(&normalized);
+    if path.exists() {
         return path.to_path_buf();
     }
 
-    let stripped = p.trim_start_matches("./").trim_start_matches(".\\");
+    // Remove accidental /apps/ or \apps\ from legacy paths
+    let de_apped = normalized
+        .replace("\\apps\\Exports\\", "\\Exports\\")
+        .replace("/apps/Exports/", "/Exports/")
+        .replace("\\apps\\", "\\")
+        .replace("/apps/", "/");
+    let de_apped_path = std::path::Path::new(&de_apped);
+    if de_apped_path.exists() {
+        return de_apped_path.to_path_buf();
+    }
+
+    if path.is_absolute() {
+        return de_apped_path.to_path_buf();
+    }
+
+    let stripped = de_apped.trim_start_matches("./").trim_start_matches(".\\").to_string();
 
     if let Ok(cwd) = std::env::current_dir() {
         if cwd.ends_with("src-tauri") {
             if let Some(root) = cwd.parent() {
-                return root.join(stripped);
+                let cand = root.join(&stripped);
+                if cand.exists() {
+                    return cand;
+                }
+                return cand;
             }
         }
-        return cwd.join(stripped);
+        let cand = cwd.join(&stripped);
+        if cand.exists() {
+            return cand;
+        }
+        return cand;
     }
 
-    std::path::PathBuf::from(p)
+    std::path::PathBuf::from(de_apped)
 }
 
 pub fn inspect_with_ffmpeg(path: &str) -> Option<StreamSummary> {

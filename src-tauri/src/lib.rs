@@ -1,11 +1,19 @@
 pub mod ffmpeg;
 pub mod gpu;
 pub mod menu;
+pub mod publish;
 pub mod state;
 
 use ffmpeg::{cleanup_incomplete_files_internal, execute_render_task, inspect_media_internal, resolve_project_path};
 use gpu::{get_gpu_encoder_info, GpuEncoderInfo};
 use menu::setup_native_menu;
+use publish::{
+    cancel_oauth_listener_internal, clear_stored_credentials_internal, exchange_oauth_code_internal,
+    highlight_in_folder_internal, listen_for_oauth_code_internal, load_stored_secrets_internal,
+    load_stored_tokens_internal, open_browser_url_internal, refresh_oauth_token_internal,
+    save_stored_secrets_internal, save_stored_tokens_internal, upload_to_youtube_internal,
+    YouTubeSecrets, YouTubeUploadParams, YouTubeUploadResult,
+};
 use state::{AppDiagnostic, RenderClipRequest, RenderClipResponse, RenderManager, StreamSummary};
 use std::process::Command;
 use std::sync::atomic::Ordering;
@@ -135,6 +143,84 @@ fn open_in_explorer(path: String) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn highlight_in_folder(path: String) -> Result<(), String> {
+    highlight_in_folder_internal(&path)
+}
+
+#[tauri::command]
+fn open_browser_url(url: String) -> Result<(), String> {
+    open_browser_url_internal(&url)
+}
+
+#[tauri::command]
+async fn listen_for_oauth_code(port: u16) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        listen_for_oauth_code_internal(port)
+    })
+    .await
+    .map_err(|e| format!("Worker failed: {}", e))?
+}
+
+#[tauri::command]
+fn cancel_oauth_listener() -> Result<(), String> {
+    cancel_oauth_listener_internal();
+    Ok(())
+}
+
+#[tauri::command]
+fn exchange_oauth_code(
+    client_id: String,
+    client_secret: String,
+    code: String,
+    redirect_uri: String,
+) -> Result<String, String> {
+    exchange_oauth_code_internal(&client_id, &client_secret, &code, &redirect_uri)
+}
+
+#[tauri::command]
+fn refresh_oauth_token(
+    client_id: String,
+    client_secret: String,
+    refresh_token: String,
+) -> Result<String, String> {
+    refresh_oauth_token_internal(&client_id, &client_secret, &refresh_token)
+}
+
+#[tauri::command]
+fn save_stored_secrets(client_id: String, client_secret: String) -> Result<(), String> {
+    save_stored_secrets_internal(&client_id, &client_secret)
+}
+
+#[tauri::command]
+fn load_stored_secrets() -> Result<Option<YouTubeSecrets>, String> {
+    load_stored_secrets_internal()
+}
+
+#[tauri::command]
+fn save_stored_tokens(tokens_json: String) -> Result<(), String> {
+    save_stored_tokens_internal(&tokens_json)
+}
+
+#[tauri::command]
+fn load_stored_tokens() -> Result<Option<String>, String> {
+    load_stored_tokens_internal()
+}
+
+#[tauri::command]
+fn clear_stored_credentials() -> Result<(), String> {
+    clear_stored_credentials_internal()
+}
+
+#[tauri::command]
+async fn upload_to_youtube(params: YouTubeUploadParams) -> Result<YouTubeUploadResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        upload_to_youtube_internal(params)
+    })
+    .await
+    .map_err(|e| format!("Upload worker failed: {}", e))?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -154,6 +240,18 @@ pub fn run() {
             render_clip,
             cancel_render,
             open_in_explorer,
+            highlight_in_folder,
+            open_browser_url,
+            listen_for_oauth_code,
+            cancel_oauth_listener,
+            exchange_oauth_code,
+            refresh_oauth_token,
+            save_stored_secrets,
+            load_stored_secrets,
+            save_stored_tokens,
+            load_stored_tokens,
+            clear_stored_credentials,
+            upload_to_youtube,
             save_project_file,
             load_project_file,
             cleanup_incomplete_files

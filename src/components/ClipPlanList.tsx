@@ -3,10 +3,26 @@ import type { Clip } from "../types/index.js";
 import { projectSignals } from "../stores/project";
 import { timelineSignals } from "../stores/timeline";
 import { queueSignals } from "../stores/queue";
-import { openInExplorer } from "../services/api";
-import { Play, Download, ExternalLink, RefreshCw, CheckCircle2, AlertCircle } from "./Icons";
+import { publishHistorySignals } from "../stores/publishHistory";
+import { openInExplorer, openBrowserUrl } from "../services/api";
+import {
+  Play,
+  Download,
+  ExternalLink,
+  RefreshCw,
+  CheckCircle2,
+  AlertCircle,
+  Share,
+  YouTubeIcon,
+  InstagramIcon,
+  TikTokIcon,
+} from "./Icons";
 
-export const ClipPlanList: Component = () => {
+interface ClipPlanListProps {
+  onPublishClip?: (clip: Clip) => void;
+}
+
+export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
   const manifest = projectSignals.currentManifest;
   const clips = createMemo(() => manifest()?.clips ?? []);
   const project = projectSignals.currentProject;
@@ -84,6 +100,21 @@ export const ClipPlanList: Component = () => {
         {/* Global Batch Render Controls */}
         <Show when={clips().length > 0}>
           <div class="flex items-center gap-1.5">
+            <Show when={renderedCount() > 0}>
+              <button
+                type="button"
+                onClick={() => {
+                  const targetClip = clips().find((c) => queueSignals.isClipRendered(c.id)) || clips()[0];
+                  if (targetClip) props.onPublishClip?.(targetClip);
+                }}
+                class="px-2.5 py-1 bg-blue-950/60 hover:bg-blue-900/80 text-blue-300 rounded text-xs font-medium cursor-pointer transition flex items-center gap-1.5 border border-blue-800/60 shadow-sm"
+                title="Open Publishing Hub for rendered clips"
+              >
+                <Share size={12} />
+                <span>Publish Hub</span>
+              </button>
+            </Show>
+
             <Show when={unrenderedCount() > 0 && renderedCount() > 0}>
               <button
                 type="button"
@@ -156,6 +187,79 @@ export const ClipPlanList: Component = () => {
                         {formatTime(clip.sourceStartSeconds)} → {formatTime(clip.sourceEndSeconds)}{" "}
                         <span class="text-zinc-600">({durationSec.toFixed(1)}s)</span>
                       </div>
+
+                      {/* Publishing History Badges */}
+                      {(() => {
+                        const history = publishHistorySignals.getClipPublishHistory(clip.id);
+                        const hasYT = history.some((r) => r.platform === "youtube");
+                        const hasInsta = history.some((r) => r.platform === "instagram");
+                        const hasTT = history.some((r) => r.platform === "tiktok");
+                        const hasStudio = history.some((r) => r.platform === "youtube_studio");
+                        const ytRecord = history.find((r) => r.platform === "youtube");
+
+                        if (!hasYT && !hasInsta && !hasTT && !hasStudio) return null;
+
+                        return (
+                          <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+                            <span class="text-[9px] text-zinc-500 font-semibold uppercase tracking-wider">
+                              Published:
+                            </span>
+
+                            <Show when={hasYT}>
+                              <span
+                                class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-950/50 text-red-300 border border-red-800/50 text-[10px] font-medium"
+                                title={`Uploaded to YouTube Shorts${ytRecord?.publishedAt ? ` on ${new Date(ytRecord.publishedAt).toLocaleDateString()}` : ""}`}
+                              >
+                                <YouTubeIcon size={10} class="text-red-500" />
+                                <span>Shorts</span>
+                                <Show when={ytRecord?.url}>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openBrowserUrl(ytRecord!.url!);
+                                    }}
+                                    class="hover:text-white ml-0.5 cursor-pointer text-red-400"
+                                    title="View on YouTube"
+                                  >
+                                    <ExternalLink size={9} />
+                                  </button>
+                                </Show>
+                              </span>
+                            </Show>
+
+                            <Show when={hasInsta}>
+                              <span
+                                class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-pink-950/50 text-pink-300 border border-pink-800/50 text-[10px] font-medium"
+                                title="Launched to Instagram Reels"
+                              >
+                                <InstagramIcon size={10} class="text-pink-400" />
+                                <span>Reels</span>
+                              </span>
+                            </Show>
+
+                            <Show when={hasTT}>
+                              <span
+                                class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-950/50 text-cyan-300 border border-cyan-800/50 text-[10px] font-medium"
+                                title="Launched to TikTok Studio"
+                              >
+                                <TikTokIcon size={10} class="text-cyan-400" />
+                                <span>TikTok</span>
+                              </span>
+                            </Show>
+
+                            <Show when={hasStudio}>
+                              <span
+                                class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-950/50 text-amber-300 border border-amber-800/50 text-[10px] font-medium"
+                                title="Launched to YouTube Studio Web"
+                              >
+                                <YouTubeIcon size={10} class="text-amber-500" />
+                                <span>YT Studio</span>
+                              </span>
+                            </Show>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
 
@@ -194,6 +298,16 @@ export const ClipPlanList: Component = () => {
 
                     {/* Action Buttons */}
                     <Show when={isRendered()}>
+                      <button
+                        type="button"
+                        onClick={() => props.onPublishClip?.(clip)}
+                        class="h-7 px-2.5 rounded bg-blue-950/40 hover:bg-blue-900/60 text-blue-300 hover:text-white border border-blue-800/50 text-[11px] font-medium cursor-pointer transition flex items-center gap-1 shadow-sm"
+                        title="Publish to YouTube Shorts or launch Instagram/TikTok web uploader"
+                      >
+                        <Share size={11} />
+                        <span>Publish</span>
+                      </button>
+
                       <button
                         type="button"
                         onClick={() => handleOpenFile(clip.id)}

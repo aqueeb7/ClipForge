@@ -34,10 +34,23 @@ export interface RenderedClipInfo {
   completedAt: string;
 }
 
+export function sanitizeCleanPath(p: string): string {
+  if (!p) return "";
+  return p
+    .replace(/[\\/]apps[\\/]Exports[\\/]/gi, "/Exports/")
+    .replace(/[\\/]apps[\\/]/gi, "/")
+    .replace(/\\/g, "/");
+}
+
 function loadPersistedQueueItems(): QueueItem[] {
   try {
     const raw = typeof localStorage !== "undefined" ? localStorage.getItem("clipforge_persisted_queue_v1") : null;
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed: QueueItem[] = JSON.parse(raw);
+    return parsed.map((item) => ({
+      ...item,
+      outputPath: sanitizeCleanPath(item.outputPath)
+    }));
   } catch {
     return [];
   }
@@ -46,7 +59,19 @@ function loadPersistedQueueItems(): QueueItem[] {
 function loadPersistedRenderedClips(): Record<string, RenderedClipInfo> {
   try {
     const raw = typeof localStorage !== "undefined" ? localStorage.getItem("clipforge_rendered_clips") : null;
-    return raw ? JSON.parse(raw) : {};
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    const cleaned: Record<string, RenderedClipInfo> = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      if (v && typeof v === "object" && "outputPath" in v) {
+        const item = v as RenderedClipInfo;
+        cleaned[k] = {
+          ...item,
+          outputPath: sanitizeCleanPath(item.outputPath)
+        };
+      }
+    }
+    return cleaned;
   } catch {
     return {};
   }
@@ -78,9 +103,10 @@ export const isClipRendered = (clipId: string) => Boolean(renderedClips[clipId])
 export const getRenderedInfo = (clipId: string) => renderedClips[clipId] ?? null;
 
 export function recordRenderedClip(clipId: string, outputPath: string, fileSizeBytes: number) {
+  const clean = sanitizeCleanPath(outputPath);
   setRenderedClips(clipId, {
     clipId,
-    outputPath,
+    outputPath: clean,
     fileSizeBytes,
     completedAt: new Date().toISOString()
   });

@@ -8,6 +8,10 @@ dist/
 build/
 *.tsbuildinfo
 
+# Rust build artifacts
+target/
+src-tauri/target/
+
 # Test and coverage
 coverage/
 .vitest/
@@ -24,6 +28,11 @@ pnpm-debug.log*
 .env
 .env.local
 .env.*.local
+.credentials/
+*.secrets.json
+*.token.json
+*.tokens.json
+client_secret*.json
 
 # ClipForge temporary and export directories
 Temp/
@@ -31,6 +40,7 @@ temp/
 .temp/
 Exports/
 exports/
+*.part.mp4
 
 # OS files
 .DS_Store
@@ -45,6 +55,3 @@ desktop.ini
 *.njsproj
 *.sln
 *.sw?
-
-target/
-node_modules/

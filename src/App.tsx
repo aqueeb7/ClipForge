@@ -12,11 +12,20 @@ import { RenderQueueModal } from "./components/Modals/RenderQueueModal";
 import { SettingsModal } from "./components/Modals/SettingsModal";
 import { NewProjectModal } from "./components/Modals/NewProjectModal";
 import { ShortcutsModal } from "./components/Modals/ShortcutsModal";
+import { PublishModal } from "./components/Modals/PublishModal";
+import type { Clip } from "./types/index.js";
 
 export const App: Component = () => {
   const [showSettings, setShowSettings] = createSignal(false);
   const [showNewProject, setShowNewProject] = createSignal(false);
   const [showShortcuts, setShowShortcuts] = createSignal(false);
+  const [showPublish, setShowPublish] = createSignal(false);
+  const [selectedClipForPublish, setSelectedClipForPublish] = createSignal<Clip | null>(null);
+
+  function handleOpenPublish(clip: Clip) {
+    setSelectedClipForPublish(clip);
+    setShowPublish(true);
+  }
 
   let cleanupLifecycle: (() => void) | null = null;
   let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -129,7 +138,7 @@ export const App: Component = () => {
 
             {/* Bottom: Clip Deck Data Table */}
             <div class="flex-1 min-h-[140px] overflow-hidden">
-              <ClipPlanList />
+              <ClipPlanList onPublishClip={handleOpenPublish} />
             </div>
           </div>
         </div>
@@ -159,7 +168,7 @@ export const App: Component = () => {
           </div>
 
           <div class="flex-1 min-h-0 overflow-hidden">
-            <ClipPlanList />
+            <ClipPlanList onPublishClip={handleOpenPublish} />
           </div>
         </div>
       </main>
@@ -169,6 +178,14 @@ export const App: Component = () => {
       <SettingsModal open={showSettings()} onClose={() => setShowSettings(false)} />
       <NewProjectModal open={showNewProject()} onClose={() => setShowNewProject(false)} />
       <ShortcutsModal open={showShortcuts()} onClose={() => setShowShortcuts(false)} />
+      <PublishModal
+        open={showPublish()}
+        clip={selectedClipForPublish()}
+        onClose={() => {
+          setShowPublish(false);
+          setSelectedClipForPublish(null);
+        }}
+      />
     </div>
   );
 };
