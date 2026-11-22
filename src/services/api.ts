@@ -910,6 +910,129 @@ export async function calibrateChatOffset(
   };
 }
 
+// ---------------------------------------------------------------------------
+// ClipForge 2.0 Phase 3: Offline Multi-Modal Intelligence Engine (Specs 007 - 010)
+// ---------------------------------------------------------------------------
+
+export interface ChatEvent {
+  id: string;
+  start_time: number;
+  end_time: number;
+  peak_time: number;
+  peak_velocity: number;
+  message_count: number;
+  sentiment_label: string; // "Hype" | "Humor" | "Shock" | "Chat Surge"
+  top_keywords: string[];
+  score: number;
+}
+
+export interface ChatAnalysisResult {
+  total_events: number;
+  average_velocity: number;
+  peak_velocity: number;
+  events: ChatEvent[];
+}
+
+export interface AudioEvent {
+  id: string;
+  start_time: number;
+  end_time: number;
+  peak_time: number;
+  peak_rms_energy: number;
+  peak_dbfs: number;
+  transient_jump_db: number;
+  classification: string;
+  score: number;
+}
+
+export interface AudioAnalysisResult {
+  total_events: number;
+  average_rms: number;
+  peak_rms: number;
+  events: AudioEvent[];
+}
+
+export interface VideoEvent {
+  id: string;
+  timestamp: number;
+  scene_score: number;
+  event_type: string;
+  score: number;
+}
+
+export interface VideoAnalysisResult {
+  total_events: number;
+  events: VideoEvent[];
+}
+
+export interface SynchronizedMoment {
+  id: string;
+  timestamp: number;
+  lead_in: number;
+  lead_out: number;
+  duration: number;
+  confidence: number;
+  headline: string;
+  sentiment: string;
+  has_chat_spike: boolean;
+  has_audio_peak: boolean;
+  has_visual_cut: boolean;
+  top_keywords: string[];
+}
+
+export interface SynchronizedAnalysisResult {
+  project_dir: string;
+  total_moments: number;
+  moments: SynchronizedMoment[];
+  chat_analysis?: ChatAnalysisResult | null;
+  audio_analysis?: AudioAnalysisResult | null;
+  video_analysis?: VideoAnalysisResult | null;
+}
+
+export interface StreamAnalysisProgressPayload {
+  stage: string;
+  percent: number;
+  message: string;
+}
+
+/**
+ * Runs the complete multi-modal offline intelligence pipeline (Specs 007 - 010)
+ */
+export async function runStreamIntelligence(
+  projectDir: string
+): Promise<SynchronizedAnalysisResult> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<SynchronizedAnalysisResult>("run_stream_intelligence", {
+      projectDir,
+    });
+  }
+  return {
+    project_dir: projectDir,
+    total_moments: 0,
+    moments: [],
+  };
+}
+
+/**
+ * Loads pre-computed stream analysis and synchronized moments from disk.
+ */
+export async function loadStreamIntelligence(
+  projectDir: string
+): Promise<SynchronizedAnalysisResult> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<SynchronizedAnalysisResult>("load_stream_intelligence", {
+      projectDir,
+    });
+  }
+  return {
+    project_dir: projectDir,
+    total_moments: 0,
+    moments: [],
+  };
+}
+
 export {
   coreAddManualClip,
   coreRemoveManualClip,

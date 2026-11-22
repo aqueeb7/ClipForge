@@ -2,7 +2,8 @@ import { Component, createSignal, createMemo, createEffect, onCleanup, Show, For
 import { projectSignals } from "../stores/project";
 import { timelineSignals } from "../stores/timeline";
 import { chatReplaySignals } from "../stores/chatReplay";
-import { Film, Scissors, Trash2, RefreshCw, Plus, Split, Sliders, MessageSquare, Flame } from "./Icons";
+import { intelligenceSignals } from "../stores/intelligence";
+import { Film, Scissors, Trash2, RefreshCw, Plus, Split, Sliders, MessageSquare, Flame, Sparkles } from "./Icons";
 
 export const TimelineScrubber: Component = () => {
   let timelineTrackRef: HTMLDivElement | undefined;
@@ -239,8 +240,59 @@ export const TimelineScrubber: Component = () => {
           </Show>
         </div>
 
-        {/* Right Section: Chat Replay Status & Zoom Controls */}
+        {/* Right Section: Multi-Modal Intelligence, Chat Replay Status & Zoom Controls */}
         <div class="flex items-center gap-2">
+          {/* Multi-Modal Highlight Intelligence (Specs 007 - 010) */}
+          <Show
+            when={intelligenceSignals.isAnalyzing()}
+            fallback={
+              <Show
+                when={intelligenceSignals.hasMoments()}
+                fallback={
+                  <Show when={projectSignals.streamProjectDir()}>
+                    <button
+                      type="button"
+                      onClick={() => intelligenceSignals.runIntelligence()}
+                      class="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-amber-300 rounded text-[11px] font-medium border border-zinc-800 transition cursor-pointer flex items-center gap-1.5"
+                      title="Run offline multi-modal intelligence (chat velocity, audio energy, visual cuts)"
+                    >
+                      <Sparkles size={11} class="text-amber-400" />
+                      <span>AI Highlights</span>
+                    </button>
+                  </Show>
+                }
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    const first = intelligenceSignals.momentsChronological()[0];
+                    if (first) intelligenceSignals.selectMoment(first);
+                  }}
+                  class="px-2.5 py-1 rounded text-[11px] font-medium bg-amber-950/60 border border-amber-700/60 text-amber-300 hover:text-white transition cursor-pointer flex items-center gap-1.5 shadow-sm"
+                  title="Jump to detected multi-modal highlight moments"
+                >
+                  <Sparkles size={11} class="text-amber-400" />
+                  <span>{intelligenceSignals.totalMoments()} Highlights</span>
+                </button>
+              </Show>
+            }
+          >
+            <div class="px-2.5 py-1 rounded text-[11px] font-medium bg-zinc-900 border border-zinc-800 text-amber-300 flex items-center gap-1.5">
+              <RefreshCw size={11} class="animate-spin text-amber-400" />
+              <span>
+                {intelligenceSignals.analysisProgress()?.stage === "audio"
+                  ? "Analyzing Audio..."
+                  : intelligenceSignals.analysisProgress()?.stage === "video"
+                  ? "Detecting Scenes..."
+                  : intelligenceSignals.analysisProgress()?.stage === "chat"
+                  ? "Analyzing Chat..."
+                  : "Correlating Highlights..."}
+                {" "}
+                {intelligenceSignals.analysisProgress()?.percent ?? 0}%
+              </span>
+            </div>
+          </Show>
+
           {/* Synchronized Chat Intelligence Button */}
           <Show
             when={chatReplaySignals.hasChat()}
@@ -336,7 +388,11 @@ export const TimelineScrubber: Component = () => {
           style={{
             width: `${timelineSignals.zoomLevel() * 100}%`,
             "min-width": "100%",
-            height: chatReplaySignals.hasChat() ? "96px" : "76px",
+            height: intelligenceSignals.hasMoments() && chatReplaySignals.hasChat()
+              ? "118px"
+              : intelligenceSignals.hasMoments() || chatReplaySignals.hasChat()
+              ? "96px"
+              : "76px",
           }}
           onMouseDown={startDrag}
         >
@@ -348,6 +404,65 @@ export const TimelineScrubber: Component = () => {
             <span>{formatTime(totalDuration() * 0.75)}</span>
             <span>{formatTime(totalDuration())}</span>
           </div>
+
+          {/* Track: Multi-Modal Highlight Moments (Spec 010) */}
+          <Show when={intelligenceSignals.hasMoments()}>
+            <div
+              class="absolute inset-x-0 h-[20px] bg-amber-950/20 border-b border-amber-900/30 overflow-hidden pointer-events-none z-12"
+              style={{ top: "16px" }}
+            >
+              <div class="absolute left-2 top-0.5 text-[8px] font-mono text-amber-400/80 uppercase tracking-wider flex items-center gap-1">
+                <Sparkles size={9} class="text-amber-400" />
+                <span>H1 Highlights ({intelligenceSignals.totalMoments()})</span>
+              </div>
+            </div>
+
+            {/* Highlight Pins & Clip Intervals */}
+            <For each={intelligenceSignals.momentsChronological()}>
+              {(moment) => {
+                const isSelected = () => intelligenceSignals.selectedMomentId() === moment.id;
+                const leftPct = () => (moment.timestamp / totalDuration()) * 100;
+                const leadInPct = () => (moment.lead_in / totalDuration()) * 100;
+                const widthPct = () => Math.max(0.5, ((moment.lead_out - moment.lead_in) / totalDuration()) * 100);
+
+                return (
+                  <>
+                    {/* Interval Range Ribbon */}
+                    <div
+                      class={`absolute h-[18px] pointer-events-none rounded transition-opacity z-15 ${
+                        isSelected()
+                          ? "bg-amber-400/25 border-l-2 border-r-2 border-amber-400"
+                          : "bg-amber-500/10 hover:bg-amber-500/20"
+                      }`}
+                      style={{
+                        top: "17px",
+                        left: `${leadInPct()}%`,
+                        width: `${widthPct()}%`,
+                      }}
+                    />
+
+                    {/* Diamond Anchor Marker */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        intelligenceSignals.selectMoment(moment);
+                      }}
+                      class={`absolute w-3 h-3 -ml-1.5 top-[19px] rotate-45 transition-transform hover:scale-125 cursor-pointer z-25 ${
+                        isSelected()
+                          ? "bg-amber-300 border-2 border-white shadow-lg shadow-amber-400/50 scale-125"
+                          : moment.confidence >= 0.8
+                          ? "bg-amber-400 border border-amber-200 shadow-sm"
+                          : "bg-yellow-500 border border-yellow-300 opacity-80"
+                      }`}
+                      style={{ left: `${leftPct()}%` }}
+                      title={`${moment.headline} • ${(moment.confidence * 100).toFixed(0)}% Conf • ${moment.sentiment}`}
+                    />
+                  </>
+                );
+              }}
+            </For>
+          </Show>
 
           {/* Hatched Dead Air Trim Zones */}
           <Show when={isIntroTrimmed() && masterInPercent() > 0}>
@@ -393,7 +508,7 @@ export const TimelineScrubber: Component = () => {
           <div
             class="absolute inset-x-0 flex items-center px-0.5"
             style={{
-              top: "16px",
+              top: intelligenceSignals.hasMoments() ? "37px" : "16px",
               height: chatReplaySignals.hasChat() ? "26px" : "28px",
             }}
           >
@@ -452,7 +567,7 @@ export const TimelineScrubber: Component = () => {
           <Show when={chatReplaySignals.hasChat()}>
             <div
               class="absolute inset-x-0 h-[26px] bg-zinc-950/80 border-t border-b border-zinc-800/60 overflow-hidden"
-              style={{ top: "43px" }}
+              style={{ top: intelligenceSignals.hasMoments() ? "64px" : "43px" }}
             >
               <div class="absolute left-2 top-0.5 text-[9px] font-mono text-zinc-500 uppercase tracking-wider pointer-events-none z-10 flex items-center gap-1">
                 <span>C1 Chat Replay Heatmap</span>

@@ -386,7 +386,7 @@ fn index_chat_stream(
     })
 }
 
-fn resolve_source_files(project_dir: &Path) -> (Option<PathBuf>, Option<PathBuf>, Option<PathBuf>) {
+pub fn resolve_source_files(project_dir: &Path) -> (Option<PathBuf>, Option<PathBuf>, Option<PathBuf>) {
     let source_dir = project_dir.join("source");
     let metadata_path = source_dir.join("metadata.json");
 

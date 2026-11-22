@@ -1,6 +1,7 @@
 pub mod downloader;
 pub mod ffmpeg;
 pub mod gpu;
+pub mod intelligence;
 pub mod menu;
 pub mod normalizer;
 pub mod publish;
@@ -10,6 +11,10 @@ use downloader::{
     cancel_download_internal, download_stream_pipeline, init_stream_project_internal,
     inspect_stream_url_internal, StreamDownloadRequest, StreamDownloadResult,
     StreamProjectLayout, StreamUrlInspection,
+};
+use intelligence::{
+    load_stream_analysis_internal, run_stream_intelligence_pipeline,
+    SynchronizedAnalysisResult,
 };
 use normalizer::{
     calibrate_chat_offset_internal, load_chat_index_internal, load_timeline_summary_internal,
@@ -293,6 +298,25 @@ fn calibrate_chat_offset(
     calibrate_chat_offset_internal(&project_dir, chat_offset_seconds)
 }
 
+#[tauri::command]
+async fn run_stream_intelligence(
+    app: tauri::AppHandle,
+    project_dir: String,
+) -> Result<SynchronizedAnalysisResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        run_stream_intelligence_pipeline(&project_dir, move |progress| {
+            let _ = app.emit("analysis-progress", progress);
+        })
+    })
+    .await
+    .map_err(|e| format!("Analysis pipeline worker failed: {}", e))?
+}
+
+#[tauri::command]
+fn load_stream_intelligence(project_dir: String) -> Result<SynchronizedAnalysisResult, String> {
+    load_stream_analysis_internal(&project_dir)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -332,6 +356,8 @@ pub fn run() {
             load_stream_chat_index,
             load_timeline_summary,
             calibrate_chat_offset,
+            run_stream_intelligence,
+            load_stream_intelligence,
             save_project_file,
             load_project_file,
             cleanup_incomplete_files

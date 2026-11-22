@@ -1,9 +1,10 @@
 import { Component, createSignal, createMemo, Show, For } from "solid-js";
 import { projectSignals } from "../stores/project";
 import { chatReplaySignals } from "../stores/chatReplay";
+import { intelligenceSignals } from "../stores/intelligence";
 import { openFileDialog, isTauriEnvironment } from "../services/api";
 import { getRecentProjects, type RecentProjectItem } from "../services/persistence";
-import { Film, Music, Plus, ExternalLink, CheckCircle2, Scissors, ArrowRight, YouTubeIcon, MessageSquare, Flame } from "./Icons";
+import { Film, Music, Plus, ExternalLink, CheckCircle2, Scissors, ArrowRight, YouTubeIcon, MessageSquare, Flame, Sparkles, RefreshCw } from "./Icons";
 import { StreamIngestModal } from "./StreamIngestModal";
 
 export const MediaPool: Component = () => {
@@ -285,6 +286,108 @@ export const MediaPool: Component = () => {
                   </span>
                 </div>
               </div>
+            </div>
+          </div>
+        </Show>
+
+        {/* Card 4: Offline Multi-Modal Intelligence Highlights (Specs 007 - 010) */}
+        <Show when={projectSignals.streamProjectDir()}>
+          <div class="p-4 rounded-xl border border-zinc-800/80 bg-zinc-950 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <div class="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                  <Sparkles size={14} />
+                </div>
+                <span class="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                  AI Highlight Intelligence
+                </span>
+              </div>
+              <Show
+                when={intelligenceSignals.hasMoments()}
+                fallback={
+                  <Show when={intelligenceSignals.isAnalyzing()}>
+                    <span class="px-2 py-0.5 rounded bg-amber-950/60 border border-amber-800/40 text-amber-400 text-[10px] font-mono font-medium animate-pulse">
+                      Analyzing...
+                    </span>
+                  </Show>
+                }
+              >
+                <span class="px-2 py-0.5 rounded bg-amber-950/60 border border-amber-800/40 text-amber-400 text-[10px] font-mono font-medium">
+                  {intelligenceSignals.totalMoments()} Moments
+                </span>
+              </Show>
+            </div>
+
+            <div class="space-y-3 text-xs pt-3">
+              <Show
+                when={intelligenceSignals.hasMoments()}
+                fallback={
+                  <div class="space-y-2">
+                    <p class="text-[11px] text-zinc-500">
+                      Fuse chat reaction bursts, audio transients (screams/shouts), and visual scene cuts into synchronized highlight moments.
+                    </p>
+                    <button
+                      type="button"
+                      disabled={intelligenceSignals.isAnalyzing()}
+                      onClick={() => intelligenceSignals.runIntelligence()}
+                      class="w-full py-1.5 px-3 rounded bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/40 text-amber-300 hover:text-white text-xs font-medium cursor-pointer transition flex items-center justify-center gap-1.5 shadow-sm"
+                    >
+                      <Show
+                        when={intelligenceSignals.isAnalyzing()}
+                        fallback={
+                          <>
+                            <Sparkles size={12} class="text-amber-400" />
+                            <span>Run Multi-Modal Analysis</span>
+                          </>
+                        }
+                      >
+                        <RefreshCw size={12} class="animate-spin text-amber-400" />
+                        <span>
+                          {intelligenceSignals.analysisProgress()?.stage.toUpperCase()}: {intelligenceSignals.analysisProgress()?.percent}%
+                        </span>
+                      </Show>
+                    </button>
+                  </div>
+                }
+              >
+                <div class="space-y-2">
+                  <div class="flex items-center justify-between text-[11px] font-mono">
+                    <span class="text-zinc-500">Top Moments:</span>
+                    <button
+                      type="button"
+                      onClick={() => intelligenceSignals.addAllMomentsAsClips()}
+                      class="text-[10px] text-amber-400 hover:text-amber-300 underline cursor-pointer"
+                    >
+                      Convert All to Clips
+                    </button>
+                  </div>
+                  <div class="space-y-1.5 max-h-28 overflow-y-auto pr-1">
+                    <For each={intelligenceSignals.moments().slice(0, 3)}>
+                      {(m) => (
+                        <div class="p-1.5 rounded bg-zinc-900/60 border border-zinc-800/60 flex items-center justify-between text-[11px]">
+                          <div class="truncate mr-2">
+                            <span class="text-amber-300 font-semibold mr-1.5 font-mono text-[10px]">
+                              {(m.confidence * 100).toFixed(0)}%
+                            </span>
+                            <span class="text-zinc-200">{m.headline}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              intelligenceSignals.addMomentAsClip(m);
+                              projectSignals.setWorkspaceTab("edit");
+                            }}
+                            class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-amber-600/30 text-zinc-300 hover:text-amber-200 border border-zinc-700 text-[10px] font-mono shrink-0 cursor-pointer transition"
+                            title="Add as manual clip to timeline"
+                          >
+                            + Clip
+                          </button>
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                </div>
+              </Show>
             </div>
           </div>
         </Show>
