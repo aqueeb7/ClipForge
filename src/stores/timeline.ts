@@ -1,5 +1,7 @@
 import { createSignal, createMemo } from "solid-js";
 
+export type PreviewViewMode = "wide" | "vertical" | "dual";
+
 // Fine-grained timeline signals for 60-120fps playhead animation without VDOM
 export const [currentTime, setCurrentTime] = createSignal(0);
 export const [isPlaying, setIsPlaying] = createSignal(false);
@@ -9,6 +11,7 @@ export const [selectedClipId, setSelectedClipId] = createSignal<string | null>(n
 export const [zoomLevel, setZoomLevel] = createSignal(1.0);
 export const [isTimelineExpanded, setIsTimelineExpanded] = createSignal(false);
 export const [isVerticalSimulated, setIsVerticalSimulated] = createSignal(true);
+export const [previewViewMode, setPreviewViewMode] = createSignal<PreviewViewMode>("dual");
 
 export const hasSelectionRange = createMemo(() => {
   const inp = inPoint();
@@ -79,8 +82,20 @@ export function toggleTimelineExpanded() {
   setIsTimelineExpanded((prev) => !prev);
 }
 
+export function setViewMode(mode: PreviewViewMode) {
+  setPreviewViewMode(mode);
+  setIsVerticalSimulated(mode !== "wide");
+}
+
 export function toggleVerticalSimulated() {
-  setIsVerticalSimulated((prev) => !prev);
+  const current = previewViewMode();
+  if (current === "dual") {
+    setViewMode("wide");
+  } else if (current === "wide") {
+    setViewMode("vertical");
+  } else {
+    setViewMode("dual");
+  }
 }
 
 export const timelineSignals = {
@@ -100,6 +115,9 @@ export const timelineSignals = {
   setIsTimelineExpanded,
   isVerticalSimulated,
   setIsVerticalSimulated,
+  previewViewMode,
+  setPreviewViewMode,
+  setViewMode,
   hasSelectionRange,
   selectionDuration,
   seek,

@@ -1,12 +1,13 @@
 import { Component, Show, createMemo } from "solid-js";
 import { projectSignals } from "../stores/project";
 import { queueSignals } from "../stores/queue";
-import { Cpu, Settings, HelpCircle, Plus, Film, Scissors, Download, CheckCircle2 } from "./Icons";
+import { Cpu, Settings, HelpCircle, Plus, Film, Scissors, Download, CheckCircle2, FolderOpen } from "./Icons";
 
 interface HeaderProps {
   onOpenSettings: () => void;
   onOpenNewProject: () => void;
   onOpenShortcuts: () => void;
+  onOpenProjectManager: () => void;
 }
 
 export const Header: Component<HeaderProps> = (props) => {
@@ -132,8 +133,18 @@ export const Header: Component<HeaderProps> = (props) => {
         </button>
       </nav>
 
-      {/* Right: Actions (New Project, Settings, Shortcuts) */}
+      {/* Right: Actions (Projects, New Project, Settings, Shortcuts) */}
       <div class="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={props.onOpenProjectManager}
+          class="h-7 px-2.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-zinc-100 text-xs font-medium cursor-pointer transition flex items-center gap-1.5"
+          title="Open Project Manager & Saved Drafts"
+        >
+          <FolderOpen size={13} class="text-blue-400" />
+          <span class="hidden md:inline">Projects</span>
+        </button>
+
         <button
           type="button"
           onClick={props.onOpenNewProject}

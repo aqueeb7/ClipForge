@@ -4,6 +4,58 @@ import type { MediaMetadata } from "./api.js";
 const SESSION_STORAGE_KEY = "clipforge_active_session_v1";
 const RECENTS_STORAGE_KEY = "clipforge_recent_projects_v1";
 const QUEUE_STORAGE_KEY = "clipforge_persisted_queue_v1";
+const DRAFTS_STORAGE_KEY = "clipforge_saved_drafts_v1";
+
+export interface SavedProjectDraft {
+  id: string;
+  name: string;
+  filePath: string;
+  projectDir?: string;
+  videoPath?: string;
+  audioPath?: string;
+  clipsCount: number;
+  candidatesCount: number;
+  hasChat: boolean;
+  status: "draft" | "in_progress" | "ready";
+  lastSaved: string;
+}
+
+export function getSavedDrafts(): SavedProjectDraft[] {
+  try {
+    if (typeof localStorage !== "undefined") {
+      const raw = localStorage.getItem(DRAFTS_STORAGE_KEY);
+      if (raw) return JSON.parse(raw) as SavedProjectDraft[];
+    }
+  } catch (err) {
+    console.warn("Failed to read drafts:", err);
+  }
+  return [];
+}
+
+export function saveProjectDraft(draft: SavedProjectDraft): void {
+  try {
+    if (typeof localStorage === "undefined") return;
+    const drafts = getSavedDrafts();
+    const idx = drafts.findIndex((d) => d.id === draft.id || d.filePath === draft.filePath || d.name === draft.name);
+    if (idx !== -1) {
+      drafts.splice(idx, 1);
+    }
+    drafts.unshift(draft);
+    localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(drafts.slice(0, 15)));
+  } catch (err) {
+    console.warn("Failed to save draft:", err);
+  }
+}
+
+export function deleteProjectDraft(id: string): void {
+  try {
+    if (typeof localStorage === "undefined") return;
+    const drafts = getSavedDrafts().filter((d) => d.id !== id && d.filePath !== id);
+    localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(drafts));
+  } catch (err) {
+    console.warn("Failed to delete draft:", err);
+  }
+}
 
 export interface RecentProjectItem {
   id: string;

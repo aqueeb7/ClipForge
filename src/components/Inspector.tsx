@@ -125,6 +125,222 @@ export const Inspector: Component = () => {
               </div>
             </div>
 
+            {/* Stacking & Framing Templates */}
+            <div>
+              <label class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
+                Framing & Stacking Template
+              </label>
+              <div class="grid grid-cols-2 gap-1.5 p-1 bg-zinc-900 border border-zinc-800 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => projectSignals.updateComposition({
+                    stacking: {
+                      ...(composition()?.stacking || {}),
+                      template: "blur_fill"
+                    }
+                  })}
+                  class={`p-2 rounded text-left transition cursor-pointer flex flex-col gap-0.5 ${
+                    (composition()?.stacking?.template || "blur_fill") === "blur_fill"
+                      ? "bg-blue-600/20 border border-blue-500/40 text-blue-300"
+                      : "text-zinc-400 hover:text-zinc-200 border border-transparent"
+                  }`}
+                >
+                  <span class="text-xs font-bold text-zinc-100">Blur Fill</span>
+                  <span class="text-[9px] text-zinc-500">Letterbox + Blurred background</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => projectSignals.updateComposition({
+                    stacking: {
+                      ...(composition()?.stacking || {}),
+                      template: "stacked_split",
+                      topHeightPercent: composition()?.stacking?.topHeightPercent || 35,
+                      topRegion: composition()?.stacking?.topRegion || { x: 2, y: 5, width: 28, height: 35 },
+                      bottomRegion: composition()?.stacking?.bottomRegion || { x: 0, y: 15, width: 100, height: 85 }
+                    }
+                  })}
+                  class={`p-2 rounded text-left transition cursor-pointer flex flex-col gap-0.5 ${
+                    composition()?.stacking?.template === "stacked_split"
+                      ? "bg-blue-600/20 border border-blue-500/40 text-blue-300"
+                      : "text-zinc-400 hover:text-zinc-200 border border-transparent"
+                  }`}
+                >
+                  <span class="text-xs font-bold text-zinc-100">Stacked Split</span>
+                  <span class="text-[9px] text-zinc-500">Facecam Top + Gameplay Bot</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => projectSignals.updateComposition({
+                    stacking: {
+                      ...(composition()?.stacking || {}),
+                      template: "split_50_50",
+                      topHeightPercent: 50,
+                      topRegion: composition()?.stacking?.topRegion || { x: 0, y: 0, width: 100, height: 50 },
+                      bottomRegion: composition()?.stacking?.bottomRegion || { x: 0, y: 50, width: 100, height: 50 }
+                    }
+                  })}
+                  class={`p-2 rounded text-left transition cursor-pointer flex flex-col gap-0.5 ${
+                    composition()?.stacking?.template === "split_50_50"
+                      ? "bg-blue-600/20 border border-blue-500/40 text-blue-300"
+                      : "text-zinc-400 hover:text-zinc-200 border border-transparent"
+                  }`}
+                >
+                  <span class="text-xs font-bold text-zinc-100">50 / 50 Split</span>
+                  <span class="text-[9px] text-zinc-500">Equal top/bottom dual zones</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => projectSignals.updateComposition({
+                    stacking: {
+                      ...(composition()?.stacking || {}),
+                      template: "pan_scan",
+                      cropRegion: composition()?.stacking?.cropRegion || { x: 21.875, y: 0, width: 56.25, height: 100 }
+                    }
+                  })}
+                  class={`p-2 rounded text-left transition cursor-pointer flex flex-col gap-0.5 ${
+                    composition()?.stacking?.template === "pan_scan"
+                      ? "bg-blue-600/20 border border-blue-500/40 text-blue-300"
+                      : "text-zinc-400 hover:text-zinc-200 border border-transparent"
+                  }`}
+                >
+                  <span class="text-xs font-bold text-zinc-100">Pan & Scan</span>
+                  <span class="text-[9px] text-zinc-500">Direct 9:16 vertical crop</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Template Specific Options */}
+            <Show when={composition()?.stacking?.template === "stacked_split" || composition()?.stacking?.template === "split_50_50"}>
+              <div class="p-3 rounded-lg bg-zinc-900 border border-zinc-800 space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                    Dual Zone Stacking Config
+                  </span>
+                  <span class="text-[10px] font-mono text-zinc-400">
+                    Top {composition()?.stacking?.topHeightPercent || 35}% / Bot {100 - (composition()?.stacking?.topHeightPercent || 35)}%
+                  </span>
+                </div>
+
+                <div class="space-y-1">
+                  <div class="flex justify-between text-[11px] text-zinc-400">
+                    <span>Vertical Split Ratio</span>
+                    <span class="font-mono text-zinc-200">{composition()?.stacking?.topHeightPercent || 35}% Top</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="20"
+                    max="70"
+                    value={composition()?.stacking?.topHeightPercent || 35}
+                    onInput={(e) => {
+                      const val = parseInt((e.target as HTMLInputElement).value, 10);
+                      projectSignals.updateComposition({
+                        stacking: {
+                          ...(composition()?.stacking || {}),
+                          template: composition()?.stacking?.template || "stacked_split",
+                          topHeightPercent: val
+                        }
+                      });
+                    }}
+                    class="w-full accent-blue-500 cursor-pointer"
+                  />
+                </div>
+
+                {/* Facecam Zone Presets */}
+                <div class="space-y-1.5 pt-2 border-t border-zinc-800">
+                  <span class="text-[10px] uppercase font-bold text-zinc-500 block">Facecam Preset Positions</span>
+                  <div class="grid grid-cols-4 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => projectSignals.updateComposition({
+                        stacking: {
+                          ...(composition()?.stacking || {}),
+                          template: composition()?.stacking?.template || "stacked_split",
+                          topRegion: { x: 2, y: 5, width: 28, height: 35 }
+                        }
+                      })}
+                      class="px-1.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-[10px] text-zinc-300 cursor-pointer text-center"
+                    >
+                      Top-Left
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => projectSignals.updateComposition({
+                        stacking: {
+                          ...(composition()?.stacking || {}),
+                          template: composition()?.stacking?.template || "stacked_split",
+                          topRegion: { x: 70, y: 5, width: 28, height: 35 }
+                        }
+                      })}
+                      class="px-1.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-[10px] text-zinc-300 cursor-pointer text-center"
+                    >
+                      Top-Right
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => projectSignals.updateComposition({
+                        stacking: {
+                          ...(composition()?.stacking || {}),
+                          template: composition()?.stacking?.template || "stacked_split",
+                          topRegion: { x: 70, y: 60, width: 28, height: 35 }
+                        }
+                      })}
+                      class="px-1.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-[10px] text-zinc-300 cursor-pointer text-center"
+                    >
+                      Bot-Right
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => projectSignals.updateComposition({
+                        stacking: {
+                          ...(composition()?.stacking || {}),
+                          template: composition()?.stacking?.template || "stacked_split",
+                          topRegion: { x: 35, y: 5, width: 30, height: 35 }
+                        }
+                      })}
+                      class="px-1.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-[10px] text-zinc-300 cursor-pointer text-center"
+                    >
+                      Center
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </Show>
+
+            <Show when={composition()?.stacking?.template === "pan_scan"}>
+              <div class="p-3 rounded-lg bg-zinc-900 border border-zinc-800 space-y-2">
+                <div class="flex items-center justify-between text-[11px]">
+                  <span class="text-zinc-400">Horizontal Pan Position</span>
+                  <span class="font-mono text-zinc-200">{((composition()?.stacking?.cropRegion?.x ?? 21.875) + 28.125).toFixed(0)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="43.75"
+                  step="0.5"
+                  value={composition()?.stacking?.cropRegion?.x ?? 21.875}
+                  onInput={(e) => {
+                    const val = parseFloat((e.target as HTMLInputElement).value);
+                    projectSignals.updateComposition({
+                      stacking: {
+                        ...(composition()?.stacking || {}),
+                        template: "pan_scan",
+                        cropRegion: { x: val, y: 0, width: 56.25, height: 100 }
+                      }
+                    });
+                  }}
+                  class="w-full accent-blue-500 cursor-pointer"
+                />
+                <div class="flex justify-between text-[9px] text-zinc-500 font-mono">
+                  <span>Left (0%)</span>
+                  <span>Center (50%)</span>
+                  <span>Right (100%)</span>
+                </div>
+              </div>
+            </Show>
+
             {/* Background Style */}
             <div>
               <label class="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">

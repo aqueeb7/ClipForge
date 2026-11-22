@@ -67,6 +67,13 @@ export function createDefaultProject(options: CreateProjectOptions): ClipForgePr
         offsetX: 0,
         offsetY: 0
       },
+      stacking: {
+        template: "blur_fill",
+        topRegion: { x: 2, y: 5, width: 28, height: 35 },
+        bottomRegion: { x: 0, y: 15, width: 100, height: 85 },
+        cropRegion: { x: 21.875, y: 0, width: 56.25, height: 100 },
+        topHeightPercent: 35
+      },
       overlay: {
         enabled: true,
         brandTitle: "CLIPFORGE",

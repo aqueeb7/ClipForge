@@ -51,4 +51,58 @@ describe("Vertical Composition Filter Builder", () => {
     expect(result.filterGraph).toContain("crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2");
     expect(result.filterGraph).toContain("format=yuv420p[vout]");
   });
+
+  it("generates stacked split filter graph for dual zone vertical short", () => {
+    const composition = CompositionSettingsSchema.parse({
+      overlay: { enabled: false },
+      stacking: {
+        template: "stacked_split",
+        topHeightPercent: 35,
+        topRegion: { x: 5, y: 5, width: 30, height: 35 },
+        bottomRegion: { x: 0, y: 20, width: 100, height: 80 }
+      }
+    });
+
+    const result = buildCompositionFilter({ composition });
+
+    expect(result.filterGraph).toContain("split=2[in_top][in_bot]");
+    expect(result.filterGraph).toContain("[in_top]crop=");
+    expect(result.filterGraph).toContain("[in_bot]crop=");
+    expect(result.filterGraph).toContain("[top][bot]vstack=inputs=2");
+    expect(result.filterGraph).toContain("format=yuv420p[vout]");
+  });
+
+  it("generates 50/50 split filter graph with equal vertical halves", () => {
+    const composition = CompositionSettingsSchema.parse({
+      overlay: { enabled: false },
+      stacking: {
+        template: "split_50_50",
+        topHeightPercent: 50,
+        topRegion: { x: 0, y: 0, width: 100, height: 50 },
+        bottomRegion: { x: 0, y: 50, width: 100, height: 50 }
+      }
+    });
+
+    const result = buildCompositionFilter({ composition });
+
+    expect(result.filterGraph).toContain("split=2[in_top][in_bot]");
+    expect(result.filterGraph).toContain("scale=1080:960");
+    expect(result.filterGraph).toContain("[top][bot]vstack=inputs=2");
+  });
+
+  it("generates pan and scan filter graph with 9:16 crop window", () => {
+    const composition = CompositionSettingsSchema.parse({
+      overlay: { enabled: false },
+      stacking: {
+        template: "pan_scan",
+        cropRegion: { x: 25, y: 0, width: 56.25, height: 100 }
+      }
+    });
+
+    const result = buildCompositionFilter({ composition });
+
+    expect(result.filterGraph).toContain("crop=in_h*9/16:in_h:in_w*0.2500:0");
+    expect(result.filterGraph).toContain("scale=1080:1920");
+    expect(result.filterGraph).toContain("format=yuv420p[vout]");
+  });
 });

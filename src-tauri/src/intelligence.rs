@@ -1072,6 +1072,7 @@ pub fn export_highlight_candidate_internal(
         brand_title: Some("CLIPFORGE".to_string()),
         episode_label: Some(format!("#{:02}", candidate.rank)),
         episode_index: Some(candidate.rank as u32),
+        ..Default::default()
     };
 
     let current_pid = Arc::new(AtomicU32::new(0));

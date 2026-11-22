@@ -346,6 +346,34 @@ pub fn execute_render_task(
                 width, height, width, height, width, height, color, overlay_chain
             )
         },
+        "stacked_split" | "split_50_50" => {
+            let top_pct = req.top_height_pct.unwrap_or(if req.mode == "split_50_50" { 50.0 } else { 35.0 });
+            let top_h = (((height as f64) * (top_pct / 100.0)).round() as u32).max(100).min(height - 100);
+            let bot_h = height - top_h;
+
+            let tx = req.top_crop_x.unwrap_or(2.0) / 100.0;
+            let ty = req.top_crop_y.unwrap_or(5.0) / 100.0;
+            let tw = (req.top_crop_w.unwrap_or(28.0) / 100.0).clamp(0.05, 1.0);
+            let th = (req.top_crop_h.unwrap_or(35.0) / 100.0).clamp(0.05, 1.0);
+
+            let bx = req.bot_crop_x.unwrap_or(0.0) / 100.0;
+            let by = req.bot_crop_y.unwrap_or(15.0) / 100.0;
+            let bw = (req.bot_crop_w.unwrap_or(100.0) / 100.0).clamp(0.05, 1.0);
+            let bh = (req.bot_crop_h.unwrap_or(85.0) / 100.0).clamp(0.05, 1.0);
+
+            format!(
+                "[0:v]split=2[in_top][in_bot];\
+                 [in_top]crop=in_w*{tw:.4}:in_h*{th:.4}:in_w*{tx:.4}:in_h*{ty:.4},scale={width}:{top_h}:force_original_aspect_ratio=increase,crop={width}:{top_h}[top];\
+                 [in_bot]crop=in_w*{bw:.4}:in_h*{bh:.4}:in_w*{bx:.4}:in_h*{by:.4},scale={width}:{bot_h}:force_original_aspect_ratio=increase,crop={width}:{bot_h}[bot];\
+                 [top][bot]vstack=inputs=2{overlay_chain},setsar=1,format=yuv420p[vout]"
+            )
+        },
+        "pan_scan" => {
+            let px = (req.pan_crop_x.unwrap_or(21.875) / 100.0).clamp(0.0, 0.4375);
+            format!(
+                "[0:v]crop=in_h*9/16:in_h:in_w*{px:.4}:0,scale={width}:{height}{overlay_chain},setsar=1,format=yuv420p[vout]"
+            )
+        },
         _ => format!(
             "[0:v]split=2[bg_in][fg_in];\
              [bg_in]scale=270:480:force_original_aspect_ratio=increase,crop=270:480,boxblur=8:2,scale={}:{}:flags=bicubic,eq=brightness=-0.15[bg];\

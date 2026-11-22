@@ -28,7 +28,7 @@ pub struct StreamSummary {
     pub aspect_ratio: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct RenderClipRequest {
     pub clip_id: Option<String>,
     pub video_path: String,
@@ -45,6 +45,16 @@ pub struct RenderClipRequest {
     pub brand_title: Option<String>,
     pub episode_label: Option<String>,
     pub episode_index: Option<u32>,
+    pub top_crop_x: Option<f64>,
+    pub top_crop_y: Option<f64>,
+    pub top_crop_w: Option<f64>,
+    pub top_crop_h: Option<f64>,
+    pub bot_crop_x: Option<f64>,
+    pub bot_crop_y: Option<f64>,
+    pub bot_crop_w: Option<f64>,
+    pub bot_crop_h: Option<f64>,
+    pub pan_crop_x: Option<f64>,
+    pub top_height_pct: Option<f64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

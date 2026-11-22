@@ -4,10 +4,14 @@ import { chatReplaySignals } from "../stores/chatReplay";
 import { intelligenceSignals } from "../stores/intelligence";
 import { openFileDialog, isTauriEnvironment } from "../services/api";
 import { getRecentProjects, type RecentProjectItem } from "../services/persistence";
-import { Film, Music, Plus, ExternalLink, CheckCircle2, Scissors, ArrowRight, YouTubeIcon, MessageSquare, Flame, Sparkles, RefreshCw } from "./Icons";
+import { Film, Music, Plus, ExternalLink, CheckCircle2, Scissors, ArrowRight, YouTubeIcon, MessageSquare, Flame, Sparkles, RefreshCw, FolderOpen } from "./Icons";
 import { StreamIngestModal } from "./StreamIngestModal";
 
-export const MediaPool: Component = () => {
+interface MediaPoolProps {
+  onOpenProjectManager?: () => void;
+}
+
+export const MediaPool: Component<MediaPoolProps> = (props) => {
   let fileInputRef: HTMLInputElement | undefined;
   let audioFileInputRef: HTMLInputElement | undefined;
 
@@ -100,6 +104,40 @@ export const MediaPool: Component = () => {
         class="hidden"
         onChange={handleAudioFileInputChange}
       />
+
+      {/* Tidy Storage & Drafts Hub Bar */}
+      <div class="p-3.5 rounded-xl border border-zinc-800 bg-zinc-900/60 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+            <FolderOpen size={16} />
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold text-zinc-200">Organized Project Workspace</span>
+              <Show when={projectSignals.streamProjectDir()}>
+                <span class="px-1.5 py-0.2 rounded bg-emerald-950/60 border border-emerald-800/40 text-emerald-400 font-mono text-[9px]">
+                  Tidy Storage Active
+                </span>
+              </Show>
+            </div>
+            <div class="flex items-center gap-2 text-[10px] font-mono text-zinc-500 mt-0.5">
+              <span>📁 source/</span>
+              <span>📁 normalized/</span>
+              <span>📁 analysis/</span>
+              <span>📁 clips/</span>
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => props.onOpenProjectManager?.()}
+          class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-xs font-semibold text-zinc-200 hover:text-white flex items-center gap-1.5 cursor-pointer transition shrink-0 shadow-sm"
+        >
+          <FolderOpen size={13} class="text-blue-400" />
+          <span>Projects & Drafts</span>
+        </button>
+      </div>
 
       {/* Main Drag & Drop / Active Ingest Area */}
       <div

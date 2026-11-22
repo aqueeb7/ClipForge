@@ -6,6 +6,22 @@ export type VideoCodec = "h264" | "hevc" | "vp9";
 export type AudioCodec = "aac" | "mp3" | "opus";
 export type VideoPreset = "ultrafast" | "superfast" | "veryfast" | "faster" | "fast" | "medium" | "slow" | "slower" | "veryslow";
 export type ExportStructure = "flat" | "dated" | "by-clip" | "nested";
+export type FramingTemplate = "blur_fill" | "stacked_split" | "pan_scan" | "split_50_50";
+
+export interface CropRegion {
+  x: number; // percentage 0-100
+  y: number; // percentage 0-100
+  width: number; // percentage 0-100
+  height: number; // percentage 0-100
+}
+
+export interface StackingSettings {
+  template: FramingTemplate;
+  topRegion?: CropRegion;
+  bottomRegion?: CropRegion;
+  cropRegion?: CropRegion;
+  topHeightPercent?: number;
+}
 
 export interface BackgroundSettings {
   mode: BackgroundMode;
@@ -32,6 +48,7 @@ export interface CompositionSettings {
   height: number;
   background: BackgroundSettings;
   gameplay: GameplaySettings;
+  stacking?: StackingSettings;
   overlay: OverlaySettings;
 }
 
@@ -66,6 +83,8 @@ export interface ManualClipItem {
   end: number;
   title?: string;
   enabled?: boolean;
+  framingTemplate?: FramingTemplate;
+  stacking?: StackingSettings;
 }
 
 export interface ManualClipSettings {
@@ -170,6 +189,16 @@ export interface RenderClipRequest {
   brand_title?: string;
   episode_label?: string;
   episode_index?: number;
+  top_crop_x?: number;
+  top_crop_y?: number;
+  top_crop_w?: number;
+  top_crop_h?: number;
+  bot_crop_x?: number;
+  bot_crop_y?: number;
+  bot_crop_w?: number;
+  bot_crop_h?: number;
+  pan_crop_x?: number;
+  top_height_pct?: number;
 }
 
 export interface RenderProgressPayload {

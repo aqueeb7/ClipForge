@@ -43,6 +43,43 @@ export function buildCompositionFilter(
   const overlayFilters = buildTextOverlayFilters(overlayOptions);
   const overlayChain = overlayFilters.length > 0 ? `,${overlayFilters.join(",")}` : "";
 
+  // 0. Stacking Mode (stacked_split, split_50_50, pan_scan)
+  const template = composition.stacking?.template;
+  if (template === "stacked_split" || template === "split_50_50") {
+    const topPct = composition.stacking?.topHeightPercent ?? (template === "split_50_50" ? 50 : 35);
+    const topH = Math.min(height - 100, Math.max(100, Math.round((height * topPct) / 100)));
+    const botH = height - topH;
+
+    const tr = composition.stacking?.topRegion ?? { x: 2, y: 5, width: 28, height: 35 };
+    const br = composition.stacking?.bottomRegion ?? { x: 0, y: 15, width: 100, height: 85 };
+
+    const tx = (tr.x / 100).toFixed(4);
+    const ty = (tr.y / 100).toFixed(4);
+    const tw = Math.min(1.0, Math.max(0.05, tr.width / 100)).toFixed(4);
+    const th = Math.min(1.0, Math.max(0.05, tr.height / 100)).toFixed(4);
+
+    const bx = (br.x / 100).toFixed(4);
+    const by = (br.y / 100).toFixed(4);
+    const bw = Math.min(1.0, Math.max(0.05, br.width / 100)).toFixed(4);
+    const bh = Math.min(1.0, Math.max(0.05, br.height / 100)).toFixed(4);
+
+    const filterGraph =
+      `[${inputLabel}]split=2[in_top][in_bot];` +
+      `[in_top]crop=in_w*${tw}:in_h*${th}:in_w*${tx}:in_h*${ty},scale=${width}:${topH}:force_original_aspect_ratio=increase,crop=${width}:${topH}[top];` +
+      `[in_bot]crop=in_w*${bw}:in_h*${bh}:in_w*${bx}:in_h*${by},scale=${width}:${botH}:force_original_aspect_ratio=increase,crop=${width}:${botH}[bot];` +
+      `[top][bot]vstack=inputs=2${overlayChain},setsar=1,format=yuv420p[${outputLabel}]`;
+
+    return { filterGraph, outputLabel };
+  }
+
+  if (template === "pan_scan") {
+    const px = Math.min(0.4375, Math.max(0, (composition.stacking?.cropRegion?.x ?? 21.875) / 100)).toFixed(4);
+    const filterGraph =
+      `[${inputLabel}]crop=in_h*9/16:in_h:in_w*${px}:0,scale=${width}:${height}${overlayChain},setsar=1,format=yuv420p[${outputLabel}]`;
+
+    return { filterGraph, outputLabel };
+  }
+
   // 1. Crop Mode (gameplay.mode === "crop")
   if (composition.gameplay.mode === "crop") {
     const filterGraph =

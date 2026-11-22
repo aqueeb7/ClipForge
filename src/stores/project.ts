@@ -5,7 +5,8 @@ import type {
   AutomaticClipSettings,
   CompositionSettings,
   ExportSettings,
-  ManualClipItem
+  ManualClipItem,
+  StackingSettings
 } from "../types/index.js";
 import {
   checkEnvironment,
@@ -28,7 +29,11 @@ import {
   saveSessionState,
   loadSessionState,
   clearSessionState,
-  addRecentProject
+  addRecentProject,
+  saveProjectDraft,
+  getSavedDrafts,
+  deleteProjectDraft,
+  type SavedProjectDraft
 } from "../services/persistence.js";
 
 // Core Signals
@@ -519,6 +524,7 @@ function updateComposition(composition: {
   height?: 1920;
   background?: Partial<CompositionSettings["background"]>;
   gameplay?: Partial<CompositionSettings["gameplay"]>;
+  stacking?: Partial<StackingSettings>;
   overlay?: Partial<CompositionSettings["overlay"]>;
 }) {
   const proj = currentProject();
@@ -535,6 +541,15 @@ function updateComposition(composition: {
       gameplay: composition.gameplay
         ? { ...proj.composition.gameplay, ...composition.gameplay }
         : proj.composition.gameplay,
+      stacking: composition.stacking
+        ? {
+            template: composition.stacking.template ?? proj.composition.stacking?.template ?? "blur_fill",
+            topRegion: composition.stacking.topRegion ?? proj.composition.stacking?.topRegion ?? { x: 2, y: 5, width: 28, height: 35 },
+            bottomRegion: composition.stacking.bottomRegion ?? proj.composition.stacking?.bottomRegion ?? { x: 0, y: 15, width: 100, height: 85 },
+            cropRegion: composition.stacking.cropRegion ?? proj.composition.stacking?.cropRegion ?? { x: 21.875, y: 0, width: 56.25, height: 100 },
+            topHeightPercent: composition.stacking.topHeightPercent ?? proj.composition.stacking?.topHeightPercent ?? 35,
+          }
+        : proj.composition.stacking,
       overlay: composition.overlay
         ? { ...proj.composition.overlay, ...composition.overlay }
         : proj.composition.overlay
@@ -679,6 +694,22 @@ function autoSave(currentTime = 0, zoomLevel = 1, isTimelineExpanded = false) {
     zoomLevel,
     isTimelineExpanded
   });
+
+  if (proj) {
+    saveProjectDraft({
+      id: proj.id,
+      name: proj.name,
+      filePath: projectFilePath() || (streamProjectDir() ? `${streamProjectDir()}/project.json` : `draft_${proj.id}`),
+      projectDir: streamProjectDir() || undefined,
+      videoPath: proj.sources.video?.path,
+      audioPath: proj.sources.audio?.path,
+      clipsCount: currentManifest()?.clips?.length || (proj.clipSettings.mode === "manual" ? proj.clipSettings.clips.length : 0),
+      candidatesCount: 0,
+      hasChat: false,
+      status: "in_progress",
+      lastSaved: new Date().toISOString(),
+    });
+  }
 }
 
 async function restoreAutoSavedSession(): Promise<boolean> {
