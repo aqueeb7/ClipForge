@@ -54,6 +54,7 @@ const [isDedicatedAudioMuted, setIsDedicatedAudioMuted] = createSignal<boolean>(
 
 // Project File & Persistence State
 const [projectFilePath, setProjectFilePath] = createSignal<string | null>(null);
+const [streamProjectDir, setStreamProjectDirState] = createSignal<string | null>(null);
 const [isDirty, setIsDirty] = createSignal<boolean>(false);
 
 // Derived Accessors (Memos)
@@ -890,6 +891,8 @@ export const projectSignals = {
   isVideoAudioMuted,
   isDedicatedAudioMuted,
   projectFilePath,
+  streamProjectDir,
+  setStreamProjectDir: setStreamProjectDirState,
   isDirty,
 
   // Memos

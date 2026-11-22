@@ -40,7 +40,15 @@ temp/
 .temp/
 Exports/
 exports/
+Projects/
+projects/
+src-tauri/Projects/
+*.part
+*.part-*
+*.ytdl
 *.part.mp4
+bin/
+tools/
 
 # OS files
 .DS_Store

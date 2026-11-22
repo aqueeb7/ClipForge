@@ -1,10 +1,12 @@
 import { Component, createSignal, createEffect, onMount, onCleanup, Show } from "solid-js";
 import { projectSignals } from "./stores/project";
+import { chatReplaySignals } from "./stores/chatReplay";
 import { setupSleepAndLifecycleWatchers } from "./services/persistence";
 
 import { Header } from "./components/Header";
 import { Inspector } from "./components/Inspector";
 import { VideoPreview } from "./components/VideoPreview";
+import { ChatReplayDrawer } from "./components/ChatReplayDrawer";
 import { TimelineScrubber } from "./components/TimelineScrubber";
 import { ClipPlanList } from "./components/ClipPlanList";
 import { MediaPool } from "./components/MediaPool";
@@ -126,9 +128,16 @@ export const App: Component = () => {
 
           {/* Right Main Studio Stage */}
           <div class="flex-1 flex flex-col p-3 gap-2.5 h-full min-h-0 overflow-hidden">
-            {/* Top: Cinema Preview Monitor + Docked Transport */}
-            <div class="h-[280px] shrink-0">
-              <VideoPreview />
+            {/* Top: Cinema Preview Monitor + Docked Transport (+ Synchronized Chat Replay Drawer) */}
+            <div class="h-[290px] shrink-0 flex gap-2.5 min-h-0">
+              <div class="flex-1 min-w-0 h-full">
+                <VideoPreview />
+              </div>
+              <Show when={chatReplaySignals.isDrawerOpen()}>
+                <div class="w-80 shrink-0 h-full">
+                  <ChatReplayDrawer />
+                </div>
+              </Show>
             </div>
 
             {/* Center: Precision Multi-track Timeline */}

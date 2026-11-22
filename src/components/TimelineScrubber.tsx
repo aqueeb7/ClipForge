@@ -1,7 +1,8 @@
 import { Component, createSignal, createMemo, createEffect, onCleanup, Show, For } from "solid-js";
 import { projectSignals } from "../stores/project";
 import { timelineSignals } from "../stores/timeline";
-import { Film, Scissors, Trash2, RefreshCw, Plus, Split, Sliders } from "./Icons";
+import { chatReplaySignals } from "../stores/chatReplay";
+import { Film, Scissors, Trash2, RefreshCw, Plus, Split, Sliders, MessageSquare, Flame } from "./Icons";
 
 export const TimelineScrubber: Component = () => {
   let timelineTrackRef: HTMLDivElement | undefined;
@@ -238,46 +239,89 @@ export const TimelineScrubber: Component = () => {
           </Show>
         </div>
 
-        {/* Right: Zoom Control */}
-        <div class="flex items-center gap-1.5 bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800">
-          <span class="text-[10px] uppercase font-mono text-zinc-500">Zoom</span>
-          <button
-            type="button"
-            onClick={timelineSignals.zoomOut}
-            class="w-4 h-4 text-zinc-400 hover:text-zinc-200 text-xs font-mono cursor-pointer"
-            title="Zoom Out"
+        {/* Right Section: Chat Replay Status & Zoom Controls */}
+        <div class="flex items-center gap-2">
+          {/* Synchronized Chat Intelligence Button */}
+          <Show
+            when={chatReplaySignals.hasChat()}
+            fallback={
+              <Show when={projectSignals.streamProjectDir()}>
+                <button
+                  type="button"
+                  onClick={() => chatReplaySignals.loadProjectChat(projectSignals.streamProjectDir()!)}
+                  disabled={chatReplaySignals.isLoading()}
+                  class="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded text-[11px] font-medium border border-zinc-800 transition cursor-pointer flex items-center gap-1.5"
+                  title="Normalize canonical timeline & load chat replay"
+                >
+                  <RefreshCw size={11} class={chatReplaySignals.isLoading() ? "animate-spin text-blue-400" : "text-zinc-400"} />
+                  <span>Sync Chat</span>
+                </button>
+              </Show>
+            }
           >
-            -
-          </button>
-          <input
-            type="range"
-            min="1"
-            max="15"
-            step="0.5"
-            value={timelineSignals.zoomLevel()}
-            onInput={(e) => timelineSignals.setZoomLevel(Number((e.target as HTMLInputElement).value))}
-            class="w-16 h-1 bg-zinc-800 rounded accent-blue-500 cursor-pointer"
-          />
-          <button
-            type="button"
-            onClick={timelineSignals.zoomIn}
-            class="w-4 h-4 text-zinc-400 hover:text-zinc-200 text-xs font-mono cursor-pointer"
-            title="Zoom In"
-          >
-            +
-          </button>
-          <span class="text-[10px] font-mono text-zinc-400 w-6 text-center tabular-nums">
-            {timelineSignals.zoomLevel().toFixed(0)}x
-          </span>
-          <Show when={timelineSignals.zoomLevel() > 1}>
             <button
               type="button"
-              onClick={timelineSignals.resetZoom}
-              class="text-[10px] font-mono text-blue-400 hover:text-blue-300 ml-1 cursor-pointer"
+              onClick={() => chatReplaySignals.toggleDrawer()}
+              class={`px-2.5 py-1 rounded text-[11px] font-medium transition cursor-pointer flex items-center gap-1.5 ${
+                chatReplaySignals.isDrawerOpen()
+                  ? "bg-emerald-950/70 border border-emerald-700/60 text-emerald-300 font-semibold shadow-sm"
+                  : "bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-zinc-100"
+              }`}
+              title="Toggle Live Chat Replay Drawer"
             >
-              Fit
+              <MessageSquare size={12} class={chatReplaySignals.isDrawerOpen() ? "text-emerald-400" : "text-zinc-400"} />
+              <span>Chat Replay</span>
+              <span class="font-mono text-[10px] opacity-80">({chatReplaySignals.totalMessages().toLocaleString()})</span>
+              <Show when={chatReplaySignals.peakVelocity() > 0}>
+                <span class="flex items-center gap-0.5 text-[10px] text-amber-400 font-mono ml-0.5">
+                  <Flame size={10} />
+                  <span>{chatReplaySignals.peakVelocity().toFixed(1)}/s</span>
+                </span>
+              </Show>
             </button>
           </Show>
+
+          {/* Zoom Control */}
+          <div class="flex items-center gap-1.5 bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800">
+            <span class="text-[10px] uppercase font-mono text-zinc-500">Zoom</span>
+            <button
+              type="button"
+              onClick={timelineSignals.zoomOut}
+              class="w-4 h-4 text-zinc-400 hover:text-zinc-200 text-xs font-mono cursor-pointer"
+              title="Zoom Out"
+            >
+              -
+            </button>
+            <input
+              type="range"
+              min="1"
+              max="15"
+              step="0.5"
+              value={timelineSignals.zoomLevel()}
+              onInput={(e) => timelineSignals.setZoomLevel(Number((e.target as HTMLInputElement).value))}
+              class="w-16 h-1 bg-zinc-800 rounded accent-blue-500 cursor-pointer"
+            />
+            <button
+              type="button"
+              onClick={timelineSignals.zoomIn}
+              class="w-4 h-4 text-zinc-400 hover:text-zinc-200 text-xs font-mono cursor-pointer"
+              title="Zoom In"
+            >
+              +
+            </button>
+            <span class="text-[10px] font-mono text-zinc-400 w-6 text-center tabular-nums">
+              {timelineSignals.zoomLevel().toFixed(0)}x
+            </span>
+            <Show when={timelineSignals.zoomLevel() > 1}>
+              <button
+                type="button"
+                onClick={timelineSignals.resetZoom}
+                class="text-[10px] font-mono text-blue-400 hover:text-blue-300 ml-1 cursor-pointer"
+              >
+                Fit
+              </button>
+            </Show>
+          </div>
         </div>
       </div>
 
@@ -292,7 +336,7 @@ export const TimelineScrubber: Component = () => {
           style={{
             width: `${timelineSignals.zoomLevel() * 100}%`,
             "min-width": "100%",
-            height: "76px"
+            height: chatReplaySignals.hasChat() ? "96px" : "76px",
           }}
           onMouseDown={startDrag}
         >
@@ -346,7 +390,13 @@ export const TimelineScrubber: Component = () => {
           </Show>
 
           {/* Track 1: Video Lane Content */}
-          <div class="absolute inset-x-0 top-5 h-7 flex items-center px-0.5">
+          <div
+            class="absolute inset-x-0 flex items-center px-0.5"
+            style={{
+              top: "16px",
+              height: chatReplaySignals.hasChat() ? "26px" : "28px",
+            }}
+          >
             <Show
               when={projectSignals.isPartsStage()}
               fallback={
@@ -398,8 +448,65 @@ export const TimelineScrubber: Component = () => {
             </Show>
           </div>
 
-          {/* Track 2: Audio Lane */}
-          <div class="absolute inset-x-0 bottom-1 h-4 bg-zinc-900/60 border-t border-zinc-800/80 flex items-center justify-between px-2 text-[9px] font-mono text-zinc-500 pointer-events-none">
+          {/* Track 2: Chat Density Heatbar / Waveform (Spec 006) */}
+          <Show when={chatReplaySignals.hasChat()}>
+            <div
+              class="absolute inset-x-0 h-[26px] bg-zinc-950/80 border-t border-b border-zinc-800/60 overflow-hidden"
+              style={{ top: "43px" }}
+            >
+              <div class="absolute left-2 top-0.5 text-[9px] font-mono text-zinc-500 uppercase tracking-wider pointer-events-none z-10 flex items-center gap-1">
+                <span>C1 Chat Replay Heatmap</span>
+                <Show when={chatReplaySignals.peakVelocity() > 0}>
+                  <span class="text-amber-400 font-semibold">• Peak {chatReplaySignals.peakVelocity().toFixed(1)}/s</span>
+                </Show>
+              </div>
+
+              {/* Bucket Bars */}
+              <div class="absolute inset-0 flex items-end">
+                <For each={chatReplaySignals.densityBuckets5s()}>
+                  {(b) => {
+                    const peak = () => chatReplaySignals.peakVelocity() || 1;
+                    const ratio = () => Math.min(1, b.velocity / peak());
+                    const heightPx = () => Math.max(2, Math.round(ratio() * 20));
+                    const isHigh = () => ratio() >= 0.65;
+                    const isMed = () => ratio() >= 0.35 && ratio() < 0.65;
+
+                    return (
+                      <div
+                        class={`transition-opacity hover:opacity-100 cursor-pointer ${
+                          isHigh()
+                            ? "bg-red-500 opacity-90 shadow-sm shadow-red-500/50"
+                            : isMed()
+                            ? "bg-amber-400 opacity-80"
+                            : "bg-sky-500/60 opacity-60"
+                        }`}
+                        style={{
+                          position: "absolute",
+                          left: `${(b.bin_start / totalDuration()) * 100}%`,
+                          width: `${Math.max(0.15, (5.0 / totalDuration()) * 100)}%`,
+                          height: `${heightPx()}px`,
+                          bottom: "1px",
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          timelineSignals.setCurrentTime(b.bin_start);
+                        }}
+                        title={`${formatTime(b.bin_start)} • ${b.count} msgs (${b.velocity.toFixed(1)} msg/s)`}
+                      />
+                    );
+                  }}
+                </For>
+              </div>
+            </div>
+          </Show>
+
+          {/* Track 3: Audio Lane */}
+          <div
+            class="absolute inset-x-0 bottom-0 bg-zinc-900/60 border-t border-zinc-800/80 flex items-center justify-between px-2 text-[9px] font-mono text-zinc-500 pointer-events-none"
+            style={{
+              height: chatReplaySignals.hasChat() ? "24px" : "18px",
+            }}
+          >
             <span class="text-zinc-400">A1 Audio Track</span>
             <Show when={hasAudioTrack()}>
               <span class="text-emerald-400">

@@ -1,9 +1,20 @@
+pub mod downloader;
 pub mod ffmpeg;
 pub mod gpu;
 pub mod menu;
+pub mod normalizer;
 pub mod publish;
 pub mod state;
 
+use downloader::{
+    cancel_download_internal, download_stream_pipeline, init_stream_project_internal,
+    inspect_stream_url_internal, StreamDownloadRequest, StreamDownloadResult,
+    StreamProjectLayout, StreamUrlInspection,
+};
+use normalizer::{
+    calibrate_chat_offset_internal, load_chat_index_internal, load_timeline_summary_internal,
+    normalize_stream_project_internal, ChatIndex, TimelineSummary,
+};
 use ffmpeg::{cleanup_incomplete_files_internal, execute_render_task, inspect_media_internal, resolve_project_path};
 use gpu::{get_gpu_encoder_info, GpuEncoderInfo};
 use menu::setup_native_menu;
@@ -17,6 +28,7 @@ use publish::{
 use state::{AppDiagnostic, RenderClipRequest, RenderClipResponse, RenderManager, StreamSummary};
 use std::process::Command;
 use std::sync::atomic::Ordering;
+use tauri::Emitter;
 
 #[tauri::command]
 fn get_gpu_info() -> GpuEncoderInfo {
@@ -221,6 +233,66 @@ async fn upload_to_youtube(params: YouTubeUploadParams) -> Result<YouTubeUploadR
     .map_err(|e| format!("Upload worker failed: {}", e))?
 }
 
+#[tauri::command]
+async fn inspect_stream_url(url: String) -> Result<StreamUrlInspection, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        inspect_stream_url_internal(&url)
+    })
+    .await
+    .map_err(|e| format!("Inspection worker failed: {}", e))?
+}
+
+#[tauri::command]
+fn init_stream_project(base_dir: String, project_name: String) -> Result<StreamProjectLayout, String> {
+    init_stream_project_internal(&base_dir, &project_name)
+}
+
+#[tauri::command]
+async fn download_stream_assets(
+    app: tauri::AppHandle,
+    req: StreamDownloadRequest,
+) -> Result<StreamDownloadResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        download_stream_pipeline(req, |progress| {
+            let _ = app.emit("download-progress", progress);
+        })
+    })
+    .await
+    .map_err(|e| format!("Download pipeline worker failed: {}", e))?
+}
+
+#[tauri::command]
+fn cancel_stream_download() -> Result<(), String> {
+    cancel_download_internal();
+    Ok(())
+}
+
+#[tauri::command]
+fn normalize_stream_project(
+    project_dir: String,
+    chat_offset_seconds: Option<f64>,
+) -> Result<TimelineSummary, String> {
+    normalize_stream_project_internal(&project_dir, chat_offset_seconds)
+}
+
+#[tauri::command]
+fn load_stream_chat_index(project_dir: String) -> Result<ChatIndex, String> {
+    load_chat_index_internal(&project_dir)
+}
+
+#[tauri::command]
+fn load_timeline_summary(project_dir: String) -> Result<TimelineSummary, String> {
+    load_timeline_summary_internal(&project_dir)
+}
+
+#[tauri::command]
+fn calibrate_chat_offset(
+    project_dir: String,
+    chat_offset_seconds: f64,
+) -> Result<TimelineSummary, String> {
+    calibrate_chat_offset_internal(&project_dir, chat_offset_seconds)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -252,6 +324,14 @@ pub fn run() {
             load_stored_tokens,
             clear_stored_credentials,
             upload_to_youtube,
+            inspect_stream_url,
+            init_stream_project,
+            download_stream_assets,
+            cancel_stream_download,
+            normalize_stream_project,
+            load_stream_chat_index,
+            load_timeline_summary,
+            calibrate_chat_offset,
             save_project_file,
             load_project_file,
             cleanup_incomplete_files

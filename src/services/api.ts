@@ -634,6 +634,282 @@ export async function clearStoredCredentials(): Promise<void> {
   }
 }
 
+export interface StreamFormatOption {
+  format_id: string;
+  ext: string;
+  resolution: string;
+  width?: number;
+  height?: number;
+  fps?: number;
+  vcodec?: string;
+  acodec?: string;
+  filesize_approx?: number;
+  is_video: boolean;
+  is_audio: boolean;
+  quality_label: string;
+}
+
+export interface StreamUrlInspection {
+  url: string;
+  title: string;
+  channel: string;
+  duration_seconds: number;
+  thumbnail_url?: string;
+  has_chat_replay: boolean;
+  video_formats: StreamFormatOption[];
+  audio_formats: StreamFormatOption[];
+  recommended_video_id: string;
+  recommended_audio_id: string;
+}
+
+export interface StreamProjectLayout {
+  project_dir: string;
+  source_dir: string;
+  normalized_dir: string;
+  analysis_dir: string;
+  highlights_dir: string;
+  clips_dir: string;
+}
+
+export interface StreamDownloadRequest {
+  url: string;
+  project_dir: string;
+  video_format_id: string;
+  audio_format_id: string;
+  download_chat: boolean;
+}
+
+export interface StreamDownloadProgressPayload {
+  stage: string;
+  percentage: number;
+  speed: string;
+  eta: string;
+  message: string;
+}
+
+export interface StreamDownloadResult {
+  success: boolean;
+  video_path?: string;
+  audio_path?: string;
+  chat_path?: string;
+  metadata_path?: string;
+  error?: string;
+}
+
+/**
+ * Inspects a YouTube livestream or video URL and extracts available quality renditions and chat replay status.
+ */
+export async function inspectStreamUrl(url: string): Promise<StreamUrlInspection> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<StreamUrlInspection>("inspect_stream_url", { url });
+  }
+  throw new Error("Stream URL inspection is only supported in native desktop mode");
+}
+
+/**
+ * Initializes a ClipForge 2.0 stream intelligence project on disk.
+ */
+export async function initStreamProject(baseDir: string, projectName: string): Promise<StreamProjectLayout> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<StreamProjectLayout>("init_stream_project", { baseDir, projectName });
+  }
+  return {
+    project_dir: `${baseDir}/${projectName}`,
+    source_dir: `${baseDir}/${projectName}/source`,
+    normalized_dir: `${baseDir}/${projectName}/normalized`,
+    analysis_dir: `${baseDir}/${projectName}/analysis`,
+    highlights_dir: `${baseDir}/${projectName}/highlights`,
+    clips_dir: `${baseDir}/${projectName}/highlights/clips`,
+  };
+}
+
+/**
+ * Executes background download of video, audio, and chat replay.
+ */
+export async function downloadStreamAssets(req: StreamDownloadRequest): Promise<StreamDownloadResult> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<StreamDownloadResult>("download_stream_assets", { req });
+  }
+  throw new Error("Stream downloading is only supported in native desktop mode");
+}
+
+/**
+ * Cancels active stream download.
+ */
+export async function cancelStreamDownload(): Promise<void> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("cancel_stream_download");
+  }
+}
+
+export interface VideoIndex {
+  path: string;
+  duration: number;
+  width: number;
+  height: number;
+  fps: number;
+  codec: string;
+  start_pts: number;
+  start_time: number;
+  total_frames: number;
+  aspect_ratio: string;
+}
+
+export interface AudioIndex {
+  path: string;
+  duration: number;
+  sample_rate: number;
+  channels: number;
+  codec: string;
+  start_pts: number;
+  start_time: number;
+  offset_seconds: number;
+}
+
+export interface ChatDensityBucket {
+  bin_start: number;
+  bin_end: number;
+  count: number;
+  velocity: number;
+}
+
+export interface NormalizedIndexedMessage {
+  index: number;
+  offset_ms: number;
+  time_seconds: number;
+  author: string;
+  message: string;
+  badges: string[];
+}
+
+export interface ChatSummaryBrief {
+  total_messages: number;
+  duration_seconds: number;
+  peak_velocity_msg_per_sec: number;
+  average_velocity_msg_per_sec: number;
+}
+
+export interface ChatIndex {
+  total_messages: number;
+  start_offset_seconds: number;
+  end_offset_seconds: number;
+  peak_velocity_msg_per_sec: number;
+  average_velocity_msg_per_sec: number;
+  density_buckets_5s: ChatDensityBucket[];
+  density_buckets_1s: ChatDensityBucket[];
+  messages: NormalizedIndexedMessage[];
+}
+
+export interface TimelineSummary {
+  project_dir: string;
+  project_timeline_duration: number;
+  video_ready: boolean;
+  audio_ready: boolean;
+  chat_ready: boolean;
+  audio_offset_seconds: number;
+  chat_offset_seconds: number;
+  synchronized: boolean;
+  video_index?: VideoIndex;
+  audio_index?: AudioIndex;
+  chat_summary?: ChatSummaryBrief;
+}
+
+/**
+ * Normalizes timestamps across video, audio, and chat replay files into a canonical timeline.
+ */
+export async function normalizeStreamProject(
+  projectDir: string,
+  chatOffsetSeconds?: number
+): Promise<TimelineSummary> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<TimelineSummary>("normalize_stream_project", {
+      projectDir,
+      chatOffsetSeconds: chatOffsetSeconds ?? null,
+    });
+  }
+  return {
+    project_dir: projectDir,
+    project_timeline_duration: 60,
+    video_ready: true,
+    audio_ready: false,
+    chat_ready: false,
+    audio_offset_seconds: 0,
+    chat_offset_seconds: 0,
+    synchronized: true,
+  };
+}
+
+/**
+ * Loads precomputed chat replay index with timestamps and density curve.
+ */
+export async function loadStreamChatIndex(projectDir: string): Promise<ChatIndex> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<ChatIndex>("load_stream_chat_index", { projectDir });
+  }
+  return {
+    total_messages: 0,
+    start_offset_seconds: 0,
+    end_offset_seconds: 0,
+    peak_velocity_msg_per_sec: 0,
+    average_velocity_msg_per_sec: 0,
+    density_buckets_5s: [],
+    density_buckets_1s: [],
+    messages: [],
+  };
+}
+
+/**
+ * Loads stream timeline summary.
+ */
+export async function loadTimelineSummary(projectDir: string): Promise<TimelineSummary> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<TimelineSummary>("load_timeline_summary", { projectDir });
+  }
+  return {
+    project_dir: projectDir,
+    project_timeline_duration: 60,
+    video_ready: true,
+    audio_ready: false,
+    chat_ready: false,
+    audio_offset_seconds: 0,
+    chat_offset_seconds: 0,
+    synchronized: true,
+  };
+}
+
+/**
+ * Recalibrates chat offset against the video anchor timeline.
+ */
+export async function calibrateChatOffset(
+  projectDir: string,
+  chatOffsetSeconds: number
+): Promise<TimelineSummary> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<TimelineSummary>("calibrate_chat_offset", {
+      projectDir,
+      chatOffsetSeconds,
+    });
+  }
+  return {
+    project_dir: projectDir,
+    project_timeline_duration: 60,
+    video_ready: true,
+    audio_ready: false,
+    chat_ready: false,
+    audio_offset_seconds: 0,
+    chat_offset_seconds: chatOffsetSeconds,
+    synchronized: true,
+  };
+}
+
 export {
   coreAddManualClip,
   coreRemoveManualClip,

@@ -1,14 +1,17 @@
 import { Component, createSignal, createMemo, Show, For } from "solid-js";
 import { projectSignals } from "../stores/project";
+import { chatReplaySignals } from "../stores/chatReplay";
 import { openFileDialog, isTauriEnvironment } from "../services/api";
 import { getRecentProjects, type RecentProjectItem } from "../services/persistence";
-import { Film, Music, Plus, ExternalLink, CheckCircle2, Scissors, ArrowRight } from "./Icons";
+import { Film, Music, Plus, ExternalLink, CheckCircle2, Scissors, ArrowRight, YouTubeIcon, MessageSquare, Flame } from "./Icons";
+import { StreamIngestModal } from "./StreamIngestModal";
 
 export const MediaPool: Component = () => {
   let fileInputRef: HTMLInputElement | undefined;
   let audioFileInputRef: HTMLInputElement | undefined;
 
   const [isDraggingOver, setIsDraggingOver] = createSignal(false);
+  const [showStreamModal, setShowStreamModal] = createSignal(false);
   const recents = createMemo(() => getRecentProjects());
 
   const videoMeta = projectSignals.videoMetadata;
@@ -124,7 +127,7 @@ export const MediaPool: Component = () => {
           </p>
         </div>
 
-        <div class="flex items-center gap-2 mt-2">
+        <div class="flex items-center gap-2 mt-2 flex-wrap justify-center">
           <button
             type="button"
             onClick={handleBrowseVideo}
@@ -132,6 +135,16 @@ export const MediaPool: Component = () => {
           >
             <Plus size={14} />
             <span>{videoMeta() ? "Replace Video File" : "Browse Video File"}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowStreamModal(true)}
+            class="px-4 py-2 rounded-lg bg-red-600/90 hover:bg-red-600 text-white text-xs font-semibold cursor-pointer shadow-sm transition flex items-center gap-1.5"
+            title="Download YouTube livestream with separate audio and historical chat replay"
+          >
+            <YouTubeIcon size={14} />
+            <span>Analyze YouTube Stream</span>
           </button>
 
           <button
@@ -240,6 +253,41 @@ export const MediaPool: Component = () => {
             </div>
           </Show>
         </div>
+
+        {/* Card 3: Live Chat Replay Stream (Spec 006) */}
+        <Show when={chatReplaySignals.hasChat()}>
+          <div class="p-4 rounded-xl border border-zinc-800/80 bg-zinc-950 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <div class="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                  <MessageSquare size={14} />
+                </div>
+                <span class="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                  Live Chat Replay
+                </span>
+              </div>
+              <span class="px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-800/40 text-emerald-400 text-[10px] font-mono font-medium">
+                Synchronized
+              </span>
+            </div>
+
+            <div class="space-y-2 text-xs pt-3">
+              <div class="grid grid-cols-2 gap-2 text-[11px] font-mono text-zinc-400">
+                <div>
+                  <span class="text-zinc-600 block text-[9px] uppercase">Total Chat</span>
+                  <span class="text-zinc-200">{chatReplaySignals.totalMessages().toLocaleString()} msgs</span>
+                </div>
+                <div>
+                  <span class="text-zinc-600 block text-[9px] uppercase">Peak Velocity</span>
+                  <span class="text-amber-400 font-semibold flex items-center gap-1">
+                    <Flame size={11} />
+                    <span>{chatReplaySignals.peakVelocity().toFixed(1)}/s</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Show>
       </div>
 
       {/* Open in Studio Action Bar */}
@@ -295,6 +343,15 @@ export const MediaPool: Component = () => {
           </div>
         </div>
       </Show>
+
+      {/* Stream Ingest Modal (ClipForge 2.0 Offline Intelligence Foundation) */}
+      <StreamIngestModal
+        open={showStreamModal()}
+        onClose={() => setShowStreamModal(false)}
+        onStreamLoaded={() => {
+          projectSignals.setWorkspaceTab("edit");
+        }}
+      />
     </div>
   );
 };
