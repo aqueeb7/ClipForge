@@ -4,6 +4,8 @@ use std::fs;
 use std::io::Read;
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, AtomicU32};
+use std::sync::Arc;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChatEvent {
@@ -95,6 +97,44 @@ pub struct StreamAnalysisProgressPayload {
     pub stage: String, // "chat" | "audio" | "video" | "correlation" | "complete"
     pub percentage: f64,
     pub message: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct HighlightCandidate {
+    pub id: String,
+    pub rank: usize,
+    pub title: String,
+    pub start_seconds: f64,
+    pub end_seconds: f64,
+    pub duration_seconds: f64,
+    pub peak_timestamp: f64,
+    pub confidence: f64,
+    pub sentiment: String,
+    pub top_keywords: Vec<String>,
+    pub hook_duration_seconds: f64,
+    pub has_immediate_hook: bool,
+    pub source_moment_id: String,
+    pub output_filename: String,
+    pub status: String, // "pending" | "rendering" | "completed" | "error"
+    pub rendered_path: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CandidateGenerationSettings {
+    pub target_duration_seconds: Option<f64>,
+    pub min_duration_seconds: Option<f64>,
+    pub max_duration_seconds: Option<f64>,
+    pub lead_in_padding: Option<f64>,
+    pub lead_out_padding: Option<f64>,
+    pub min_confidence: Option<f64>,
+    pub merge_gap_seconds: Option<f64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CandidateGenerationResult {
+    pub project_dir: String,
+    pub total_candidates: usize,
+    pub candidates: Vec<HighlightCandidate>,
 }
 
 // ---------------------------------------------------------------------------
@@ -763,5 +803,320 @@ pub fn load_stream_analysis_internal(
 
     serde_json::from_str::<SynchronizedAnalysisResult>(&content)
         .map_err(|e| format!("Failed to parse analysis result: {}", e))
+}
+
+// ---------------------------------------------------------------------------
+// SPEC 011: Highlight Candidate Generator & Ranking
+// ---------------------------------------------------------------------------
+
+pub fn generate_highlight_candidates_internal(
+    project_dir_str: &str,
+    settings_opt: Option<CandidateGenerationSettings>,
+) -> Result<CandidateGenerationResult, String> {
+    let sync_res = load_stream_analysis_internal(project_dir_str)?;
+    let video_duration = sync_res.video_duration;
+
+    let settings = settings_opt.unwrap_or(CandidateGenerationSettings {
+        target_duration_seconds: Some(30.0),
+        min_duration_seconds: Some(15.0),
+        max_duration_seconds: Some(60.0),
+        lead_in_padding: Some(5.0),
+        lead_out_padding: Some(20.0),
+        min_confidence: Some(0.40),
+        merge_gap_seconds: Some(8.0),
+    });
+
+    let _target_dur = settings.target_duration_seconds.unwrap_or(30.0);
+    let min_dur = settings.min_duration_seconds.unwrap_or(15.0);
+    let max_dur = settings.max_duration_seconds.unwrap_or(60.0);
+    let lead_in = settings.lead_in_padding.unwrap_or(5.0);
+    let lead_out = settings.lead_out_padding.unwrap_or(20.0);
+    let min_conf = settings.min_confidence.unwrap_or(0.40);
+    let merge_gap = settings.merge_gap_seconds.unwrap_or(8.0);
+
+    // Filter moments meeting min confidence
+    let mut eligible_moments: Vec<&SynchronizedMoment> = sync_res
+        .moments
+        .iter()
+        .filter(|m| m.composite_score >= min_conf)
+        .collect();
+
+    if eligible_moments.is_empty() {
+        return Ok(CandidateGenerationResult {
+            project_dir: project_dir_str.to_string(),
+            total_candidates: 0,
+            candidates: Vec::new(),
+        });
+    }
+
+    // Sort chronologically to detect overlap and merge adjacent peaks
+    eligible_moments.sort_by(|a, b| a.timestamp.partial_cmp(&b.timestamp).unwrap());
+
+    struct CandidateCluster {
+        start: f64,
+        end: f64,
+        peak_timestamp: f64,
+        max_score: f64,
+        sentiment: String,
+        keywords: Vec<String>,
+        source_id: String,
+        label: String,
+    }
+
+    let mut clusters: Vec<CandidateCluster> = Vec::new();
+
+    for moment in eligible_moments {
+        let proposed_start = (moment.timestamp - lead_in).max(0.0);
+        let proposed_end = (moment.timestamp + lead_out).min(video_duration);
+
+        if let Some(last) = clusters.last_mut() {
+            // Check if proposed window overlaps or is within merge_gap of the previous cluster
+            if proposed_start <= last.end + merge_gap {
+                let merged_end = last.end.max(proposed_end);
+                if merged_end - last.start <= max_dur {
+                    last.end = merged_end;
+                    if moment.composite_score > last.max_score {
+                        last.max_score = moment.composite_score;
+                        last.peak_timestamp = moment.timestamp;
+                        last.sentiment = moment.label.clone();
+                        last.label = moment.label.clone();
+                    }
+                    for kw in &moment.keywords {
+                        if !last.keywords.contains(kw) && last.keywords.len() < 5 {
+                            last.keywords.push(kw.clone());
+                        }
+                    }
+                    continue;
+                }
+            }
+        }
+
+        clusters.push(CandidateCluster {
+            start: proposed_start,
+            end: proposed_end,
+            peak_timestamp: moment.timestamp,
+            max_score: moment.composite_score,
+            sentiment: moment.label.clone(),
+            keywords: moment.keywords.clone(),
+            source_id: moment.id.clone(),
+            label: moment.label.clone(),
+        });
+    }
+
+    let mut candidates: Vec<HighlightCandidate> = Vec::new();
+
+    for cluster in clusters {
+        let mut start = cluster.start;
+        let mut end = cluster.end;
+        let mut duration = end - start;
+
+        // Ensure within min_duration and max_duration
+        if duration < min_dur {
+            let diff = min_dur - duration;
+            start = (start - diff / 2.0).max(0.0);
+            end = (start + min_dur).min(video_duration);
+            duration = end - start;
+        }
+
+        if duration > max_dur {
+            end = start + max_dur;
+            duration = max_dur;
+        }
+
+        let hook_duration = (cluster.peak_timestamp - start).clamp(3.0, 5.0);
+        let has_immediate_hook = (cluster.peak_timestamp - start) <= 6.0;
+
+        let safe_title = if !cluster.keywords.is_empty() {
+            format!("{} ({})", cluster.label, cluster.keywords.join(" "))
+        } else {
+            format!("{} Highlight @ {}s", cluster.label, cluster.peak_timestamp.round() as u64)
+        };
+
+        candidates.push(HighlightCandidate {
+            id: format!("candidate-{}", candidates.len() + 1),
+            rank: 0,
+            title: safe_title,
+            start_seconds: (start * 100.0).round() / 100.0,
+            end_seconds: (end * 100.0).round() / 100.0,
+            duration_seconds: (duration * 100.0).round() / 100.0,
+            peak_timestamp: (cluster.peak_timestamp * 100.0).round() / 100.0,
+            confidence: (cluster.max_score * 1000.0).round() / 1000.0,
+            sentiment: cluster.sentiment,
+            top_keywords: cluster.keywords,
+            hook_duration_seconds: hook_duration,
+            has_immediate_hook,
+            source_moment_id: cluster.source_id,
+            output_filename: String::new(),
+            status: "pending".to_string(),
+            rendered_path: None,
+        });
+    }
+
+    // Sort by confidence descending and assign ranks
+    candidates.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap());
+
+    for (idx, candidate) in candidates.iter_mut().enumerate() {
+        candidate.rank = idx + 1;
+        let slug = candidate
+            .title
+            .to_lowercase()
+            .replace(|c: char| !c.is_alphanumeric() && c != ' ', "")
+            .split_whitespace()
+            .take(4)
+            .collect::<Vec<&str>>()
+            .join("_");
+        candidate.output_filename = format!("{:02}_{}.mp4", candidate.rank, slug);
+    }
+
+    let highlights_dir = Path::new(project_dir_str).join("highlights");
+    let _ = fs::create_dir_all(&highlights_dir);
+    let candidates_path = highlights_dir.join("candidates.json");
+    let res = CandidateGenerationResult {
+        project_dir: project_dir_str.to_string(),
+        total_candidates: candidates.len(),
+        candidates,
+    };
+
+    let _ = fs::write(
+        &candidates_path,
+        serde_json::to_string_pretty(&res).map_err(|e| e.to_string())?,
+    );
+
+    Ok(res)
+}
+
+pub fn load_highlight_candidates_internal(
+    project_dir_str: &str,
+) -> Result<CandidateGenerationResult, String> {
+    let candidates_path = Path::new(project_dir_str)
+        .join("highlights")
+        .join("candidates.json");
+
+    if !candidates_path.exists() {
+        return generate_highlight_candidates_internal(project_dir_str, None);
+    }
+
+    let content = fs::read_to_string(&candidates_path)
+        .map_err(|e| format!("Failed to read candidates file: {}", e))?;
+
+    serde_json::from_str::<CandidateGenerationResult>(&content)
+        .map_err(|e| format!("Failed to parse candidates: {}", e))
+}
+
+// ---------------------------------------------------------------------------
+// SPEC 012: Batch Vertical Clip Exporter
+// ---------------------------------------------------------------------------
+
+pub fn export_highlight_candidate_internal(
+    app: tauri::AppHandle,
+    project_dir_str: &str,
+    candidate_id: &str,
+    mode_opt: Option<String>,
+) -> Result<super::state::RenderClipResponse, String> {
+    let project_dir = Path::new(project_dir_str);
+    let candidates_res = load_highlight_candidates_internal(project_dir_str)?;
+
+    let candidate = candidates_res
+        .candidates
+        .into_iter()
+        .find(|c| c.id == candidate_id)
+        .ok_or_else(|| format!("Highlight candidate not found: {}", candidate_id))?;
+
+    let (video_file, audio_file, _) = resolve_source_files(project_dir);
+    let video_path = video_file
+        .ok_or_else(|| "Source video file not found in project".to_string())?
+        .to_string_lossy()
+        .to_string();
+
+    let audio_path = audio_file.map(|p| p.to_string_lossy().to_string());
+
+    let summary_path = project_dir.join("normalized").join("timeline-summary.json");
+    let audio_offset_ms = if summary_path.exists() {
+        if let Ok(content) = fs::read_to_string(&summary_path) {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                let off_sec = val["audio_offset_seconds"].as_f64().unwrap_or(0.0);
+                Some((off_sec * 1000.0).round() as i64)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let clips_dir = project_dir.join("highlights").join("clips");
+    fs::create_dir_all(&clips_dir)
+        .map_err(|e| format!("Failed to create clips directory: {}", e))?;
+
+    let output_path = clips_dir
+        .join(&candidate.output_filename)
+        .to_string_lossy()
+        .to_string();
+    let mode = mode_opt.unwrap_or_else(|| "blur_fill".to_string());
+
+    let req = super::state::RenderClipRequest {
+        clip_id: Some(candidate.id.clone()),
+        video_path,
+        audio_path,
+        audio_offset_ms,
+        start_seconds: candidate.start_seconds,
+        duration_seconds: candidate.duration_seconds,
+        output_path: output_path.clone(),
+        mode,
+        bg_color: Some("#000000".to_string()),
+        crf: Some(18),
+        preset: Some("fast".to_string()),
+        overlay_enabled: Some(true),
+        brand_title: Some("CLIPFORGE".to_string()),
+        episode_label: Some(format!("#{:02}", candidate.rank)),
+        episode_index: Some(candidate.rank as u32),
+    };
+
+    let current_pid = Arc::new(AtomicU32::new(0));
+    let cancelled = Arc::new(AtomicBool::new(false));
+
+    let res = super::ffmpeg::execute_render_task(app, req, current_pid, cancelled)?;
+
+    if res.success {
+        let sidecar_path = clips_dir.join(format!("{}.json", candidate.output_filename));
+        let now_sec = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        let sidecar_data = serde_json::json!({
+            "candidate_id": candidate.id,
+            "rank": candidate.rank,
+            "title": candidate.title,
+            "start_seconds": candidate.start_seconds,
+            "end_seconds": candidate.end_seconds,
+            "duration_seconds": candidate.duration_seconds,
+            "peak_timestamp": candidate.peak_timestamp,
+            "confidence": candidate.confidence,
+            "sentiment": candidate.sentiment,
+            "top_keywords": candidate.top_keywords,
+            "has_immediate_hook": candidate.has_immediate_hook,
+            "output_file": candidate.output_filename,
+            "rendered_unix": now_sec,
+        });
+        let _ = fs::write(&sidecar_path, serde_json::to_string_pretty(&sidecar_data).unwrap());
+
+        if let Ok(mut updated) = load_highlight_candidates_internal(project_dir_str) {
+            for c in &mut updated.candidates {
+                if c.id == candidate.id {
+                    c.status = "completed".to_string();
+                    c.rendered_path = Some(res.output_path.clone());
+                }
+            }
+            let _ = fs::write(
+                project_dir.join("highlights").join("candidates.json"),
+                serde_json::to_string_pretty(&updated).unwrap(),
+            );
+        }
+    }
+
+    Ok(res)
 }
 

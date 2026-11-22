@@ -264,15 +264,16 @@ export const TimelineScrubber: Component = () => {
               >
                 <button
                   type="button"
-                  onClick={() => {
-                    const first = intelligenceSignals.momentsChronological()[0];
-                    if (first) intelligenceSignals.selectMoment(first);
-                  }}
-                  class="px-2.5 py-1 rounded text-[11px] font-medium bg-amber-950/60 border border-amber-700/60 text-amber-300 hover:text-white transition cursor-pointer flex items-center gap-1.5 shadow-sm"
-                  title="Jump to detected multi-modal highlight moments"
+                  onClick={() => intelligenceSignals.toggleCandidatesDrawer()}
+                  class={`px-2.5 py-1 rounded text-[11px] font-medium transition cursor-pointer flex items-center gap-1.5 shadow-sm ${
+                    intelligenceSignals.isCandidatesDrawerOpen()
+                      ? "bg-amber-500 text-black font-semibold shadow-amber-500/20"
+                      : "bg-amber-950/60 border border-amber-700/60 text-amber-300 hover:text-white"
+                  }`}
+                  title="Toggle Ranked Highlight Candidates Drawer (Specs 011 & 012)"
                 >
-                  <Sparkles size={11} class="text-amber-400" />
-                  <span>{intelligenceSignals.totalMoments()} Highlights</span>
+                  <Sparkles size={11} class={intelligenceSignals.isCandidatesDrawerOpen() ? "text-black" : "text-amber-400"} />
+                  <span>{intelligenceSignals.totalCandidates() || intelligenceSignals.totalMoments()} Highlights</span>
                 </button>
               </Show>
             }

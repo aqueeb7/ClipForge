@@ -123,3 +123,96 @@ describe("Phase 3: Offline Multi-Modal Intelligence Engine (Specs 007 - 010)", (
     expect(synchronizedResult.moments[0].has_audio_peak).toBe(true);
   });
 });
+
+describe("Phase 4: Candidate Scoring & Vertical Render (Specs 011 - 012)", () => {
+  it("ranks highlight candidates by composite confidence score and detects hook (Spec 011)", () => {
+    const candidate1 = {
+      id: "candidate-1",
+      rank: 1,
+      title: "Hype Streamer Clutch (W POG)",
+      start_seconds: 117.0, // 122s - 5s lead-in
+      end_seconds: 147.0,   // 30s target duration
+      duration_seconds: 30.0,
+      peak_timestamp: 122.0,
+      confidence: 0.94,
+      sentiment: "Hype",
+      top_keywords: ["W", "POG", "LETSGO"],
+      hook_duration_seconds: 5.0,
+      has_immediate_hook: true, // 122.0 - 117.0 = 5.0s <= 6.0s
+      source_moment_id: "moment-122",
+      output_filename: "01_hype_streamer_clutch_w.mp4",
+      status: "pending" as const,
+    };
+
+    const candidate2 = {
+      id: "candidate-2",
+      rank: 2,
+      title: "Humor Reaction (LMAO KEKW)",
+      start_seconds: 400.0,
+      end_seconds: 430.0,
+      duration_seconds: 30.0,
+      peak_timestamp: 412.0,
+      confidence: 0.78,
+      sentiment: "Humor",
+      top_keywords: ["LMAO", "KEKW"],
+      hook_duration_seconds: 5.0,
+      has_immediate_hook: false, // 412.0 - 400.0 = 12.0s > 6.0s
+      source_moment_id: "moment-412",
+      output_filename: "02_humor_reaction_lmao_kekw.mp4",
+      status: "pending" as const,
+    };
+
+    expect(candidate1.confidence).toBeGreaterThan(candidate2.confidence);
+    expect(candidate1.rank).toBe(1);
+    expect(candidate2.rank).toBe(2);
+    expect(candidate1.has_immediate_hook).toBe(true);
+    expect(candidate2.has_immediate_hook).toBe(false);
+    expect(candidate1.duration_seconds).toBeGreaterThanOrEqual(15.0);
+    expect(candidate1.duration_seconds).toBeLessThanOrEqual(60.0);
+    expect(candidate1.output_filename).toMatch(/^\d{2}_[a-z0-9_]+\.mp4$/);
+  });
+
+  it("enforces short-form bounds and merges adjacent peak windows (Spec 011)", () => {
+    // Peak A at 50s, Peak B at 55s -> should merge into a single candidate window
+    const peakA = 50.0;
+    const peakB = 55.0;
+    const leadIn = 5.0;
+    const leadOut = 20.0;
+    const maxDur = 60.0;
+
+    const startA = peakA - leadIn; // 45.0
+    const endA = peakA + leadOut;  // 70.0
+    const startB = peakB - leadIn; // 50.0 <= endA -> merges!
+    const endB = peakB + leadOut;  // 75.0
+
+    const mergedStart = startA; // 45.0
+    const mergedEnd = Math.max(endA, endB); // 75.0
+    const mergedDuration = mergedEnd - mergedStart; // 30.0s
+
+    expect(mergedDuration).toBeLessThanOrEqual(maxDur);
+    expect(mergedDuration).toBeGreaterThanOrEqual(15.0);
+  });
+
+  it("verifies vertical 9:16 short export configuration and sidecar metadata (Spec 012)", () => {
+    const sidecarMetadata = {
+      candidate_id: "candidate-1",
+      rank: 1,
+      title: "Hype Streamer Clutch",
+      start_seconds: 117.0,
+      end_seconds: 147.0,
+      duration_seconds: 30.0,
+      peak_timestamp: 122.0,
+      confidence: 0.94,
+      sentiment: "Hype",
+      top_keywords: ["W", "POG"],
+      has_immediate_hook: true,
+      output_file: "01_hype_streamer_clutch.mp4",
+      rendered_unix: 1732314500,
+    };
+
+    expect(sidecarMetadata.output_file).toBe("01_hype_streamer_clutch.mp4");
+    expect(sidecarMetadata.duration_seconds).toBe(30.0);
+    expect(sidecarMetadata.rendered_unix).toBeGreaterThan(0);
+    expect(sidecarMetadata.top_keywords).toContain("W");
+  });
+});

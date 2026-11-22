@@ -1,12 +1,14 @@
 import { Component, createSignal, createEffect, onMount, onCleanup, Show } from "solid-js";
 import { projectSignals } from "./stores/project";
 import { chatReplaySignals } from "./stores/chatReplay";
+import { intelligenceSignals } from "./stores/intelligence";
 import { setupSleepAndLifecycleWatchers } from "./services/persistence";
 
 import { Header } from "./components/Header";
 import { Inspector } from "./components/Inspector";
 import { VideoPreview } from "./components/VideoPreview";
 import { ChatReplayDrawer } from "./components/ChatReplayDrawer";
+import { HighlightCandidatesDrawer } from "./components/HighlightCandidatesDrawer";
 import { TimelineScrubber } from "./components/TimelineScrubber";
 import { ClipPlanList } from "./components/ClipPlanList";
 import { MediaPool } from "./components/MediaPool";
@@ -136,6 +138,11 @@ export const App: Component = () => {
               <Show when={chatReplaySignals.isDrawerOpen()}>
                 <div class="w-80 shrink-0 h-full">
                   <ChatReplayDrawer />
+                </div>
+              </Show>
+              <Show when={intelligenceSignals.isCandidatesDrawerOpen()}>
+                <div class="w-84 shrink-0 h-full">
+                  <HighlightCandidatesDrawer />
                 </div>
               </Show>
             </div>

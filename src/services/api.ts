@@ -1033,6 +1033,109 @@ export async function loadStreamIntelligence(
   };
 }
 
+// ---------------------------------------------------------------------------
+// ClipForge 2.0 Phase 4: Candidate Scoring & Vertical Render (Specs 011 - 012)
+// ---------------------------------------------------------------------------
+
+export interface HighlightCandidate {
+  id: string;
+  rank: number;
+  title: string;
+  start_seconds: number;
+  end_seconds: number;
+  duration_seconds: number;
+  peak_timestamp: number;
+  confidence: number;
+  sentiment: string;
+  top_keywords: string[];
+  hook_duration_seconds: number;
+  has_immediate_hook: boolean;
+  source_moment_id: string;
+  output_filename: string;
+  status: "pending" | "rendering" | "completed" | "error";
+  rendered_path?: string | null;
+}
+
+export interface CandidateGenerationSettings {
+  target_duration_seconds?: number;
+  min_duration_seconds?: number;
+  max_duration_seconds?: number;
+  lead_in_padding?: number;
+  lead_out_padding?: number;
+  min_confidence?: number;
+  merge_gap_seconds?: number;
+}
+
+export interface CandidateGenerationResult {
+  project_dir: string;
+  total_candidates: number;
+  candidates: HighlightCandidate[];
+}
+
+/**
+ * Generates ranked highlight clip candidates with context padding and hook detection (Spec 011)
+ */
+export async function generateHighlightCandidates(
+  projectDir: string,
+  settings?: CandidateGenerationSettings
+): Promise<CandidateGenerationResult> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<CandidateGenerationResult>("generate_highlight_candidates", {
+      projectDir,
+      settings: settings ?? null,
+    });
+  }
+  return {
+    project_dir: projectDir,
+    total_candidates: 0,
+    candidates: [],
+  };
+}
+
+/**
+ * Loads pre-computed highlight candidates from disk (Spec 011)
+ */
+export async function loadHighlightCandidates(
+  projectDir: string
+): Promise<CandidateGenerationResult> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<CandidateGenerationResult>("load_highlight_candidates", {
+      projectDir,
+    });
+  }
+  return {
+    project_dir: projectDir,
+    total_candidates: 0,
+    candidates: [],
+  };
+}
+
+/**
+ * Renders a single highlight candidate into vertical 9:16 format with blurred background (Spec 012)
+ */
+export async function exportHighlightCandidate(
+  projectDir: string,
+  candidateId: string,
+  mode: string = "blur_fill"
+): Promise<RenderClipResponse> {
+  if (isTauriEnvironment()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<RenderClipResponse>("export_highlight_candidate", {
+      projectDir,
+      candidateId,
+      mode,
+    });
+  }
+  return {
+    success: true,
+    output_path: `${projectDir}/highlights/clips/${candidateId}.mp4`,
+    duration_seconds: 30,
+    file_size_bytes: 1024 * 1024 * 15,
+  };
+}
+
 export {
   coreAddManualClip,
   coreRemoveManualClip,

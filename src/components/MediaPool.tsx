@@ -352,39 +352,86 @@ export const MediaPool: Component = () => {
               >
                 <div class="space-y-2">
                   <div class="flex items-center justify-between text-[11px] font-mono">
-                    <span class="text-zinc-500">Top Moments:</span>
+                    <span class="text-zinc-500">
+                      Top Ranked Shorts ({intelligenceSignals.totalCandidates() || intelligenceSignals.totalMoments()}):
+                    </span>
                     <button
                       type="button"
-                      onClick={() => intelligenceSignals.addAllMomentsAsClips()}
+                      onClick={() => {
+                        intelligenceSignals.openCandidatesDrawer();
+                        projectSignals.setWorkspaceTab("edit");
+                      }}
                       class="text-[10px] text-amber-400 hover:text-amber-300 underline cursor-pointer"
                     >
-                      Convert All to Clips
+                      View All Shorts &rarr;
                     </button>
                   </div>
-                  <div class="space-y-1.5 max-h-28 overflow-y-auto pr-1">
-                    <For each={intelligenceSignals.moments().slice(0, 3)}>
-                      {(m) => (
-                        <div class="p-1.5 rounded bg-zinc-900/60 border border-zinc-800/60 flex items-center justify-between text-[11px]">
-                          <div class="truncate mr-2">
-                            <span class="text-amber-300 font-semibold mr-1.5 font-mono text-[10px]">
-                              {(m.confidence * 100).toFixed(0)}%
-                            </span>
-                            <span class="text-zinc-200">{m.headline}</span>
+                  <div class="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                    <Show
+                      when={intelligenceSignals.hasCandidates()}
+                      fallback={
+                        <For each={intelligenceSignals.moments().slice(0, 3)}>
+                          {(m) => (
+                            <div class="p-1.5 rounded bg-zinc-900/60 border border-zinc-800/60 flex items-center justify-between text-[11px]">
+                              <div class="truncate mr-2">
+                                <span class="text-amber-300 font-semibold mr-1.5 font-mono text-[10px]">
+                                  {(m.confidence * 100).toFixed(0)}%
+                                </span>
+                                <span class="text-zinc-200">{m.headline}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  intelligenceSignals.addMomentAsClip(m);
+                                  projectSignals.setWorkspaceTab("edit");
+                                }}
+                                class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-amber-600/30 text-zinc-300 hover:text-amber-200 border border-zinc-700 text-[10px] font-mono shrink-0 cursor-pointer transition"
+                                title="Add as manual clip to timeline"
+                              >
+                                + Clip
+                              </button>
+                            </div>
+                          )}
+                        </For>
+                      }
+                    >
+                      <For each={intelligenceSignals.candidates().slice(0, 3)}>
+                        {(c) => (
+                          <div class="p-1.5 rounded bg-zinc-900/60 border border-zinc-800/60 flex items-center justify-between text-[11px]">
+                            <div class="truncate mr-2 flex items-center gap-1.5">
+                              <span class="px-1 py-0.2 rounded bg-amber-400 text-black font-bold font-mono text-[9px]">
+                                #{c.rank}
+                              </span>
+                              <span class="text-zinc-200 truncate">{c.title}</span>
+                              <span class="text-zinc-500 font-mono text-[9px] shrink-0">
+                                {c.duration_seconds.toFixed(0)}s
+                              </span>
+                            </div>
+                            <div class="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  intelligenceSignals.addCandidateToProjectPlan(c);
+                                  projectSignals.setWorkspaceTab("edit");
+                                }}
+                                class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-amber-600/30 text-zinc-300 hover:text-amber-200 border border-zinc-700 text-[10px] font-mono cursor-pointer transition"
+                                title="Add candidate to project plan"
+                              >
+                                + Plan
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => intelligenceSignals.exportCandidate(c)}
+                                class="px-2 py-0.5 rounded bg-amber-600/30 hover:bg-amber-600 text-amber-200 hover:text-white border border-amber-500/40 text-[10px] font-mono cursor-pointer transition"
+                                title="Render 9:16 vertical short"
+                              >
+                                9:16
+                              </button>
+                            </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              intelligenceSignals.addMomentAsClip(m);
-                              projectSignals.setWorkspaceTab("edit");
-                            }}
-                            class="px-2 py-0.5 rounded bg-zinc-800 hover:bg-amber-600/30 text-zinc-300 hover:text-amber-200 border border-zinc-700 text-[10px] font-mono shrink-0 cursor-pointer transition"
-                            title="Add as manual clip to timeline"
-                          >
-                            + Clip
-                          </button>
-                        </div>
-                      )}
-                    </For>
+                        )}
+                      </For>
+                    </Show>
                   </div>
                 </div>
               </Show>

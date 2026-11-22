@@ -13,8 +13,10 @@ use downloader::{
     StreamProjectLayout, StreamUrlInspection,
 };
 use intelligence::{
-    load_stream_analysis_internal, run_stream_intelligence_pipeline,
-    SynchronizedAnalysisResult,
+    export_highlight_candidate_internal, generate_highlight_candidates_internal,
+    load_highlight_candidates_internal, load_stream_analysis_internal,
+    run_stream_intelligence_pipeline, CandidateGenerationResult,
+    CandidateGenerationSettings, SynchronizedAnalysisResult,
 };
 use normalizer::{
     calibrate_chat_offset_internal, load_chat_index_internal, load_timeline_summary_internal,
@@ -317,6 +319,33 @@ fn load_stream_intelligence(project_dir: String) -> Result<SynchronizedAnalysisR
     load_stream_analysis_internal(&project_dir)
 }
 
+#[tauri::command]
+fn generate_highlight_candidates(
+    project_dir: String,
+    settings: Option<CandidateGenerationSettings>,
+) -> Result<CandidateGenerationResult, String> {
+    generate_highlight_candidates_internal(&project_dir, settings)
+}
+
+#[tauri::command]
+fn load_highlight_candidates(project_dir: String) -> Result<CandidateGenerationResult, String> {
+    load_highlight_candidates_internal(&project_dir)
+}
+
+#[tauri::command]
+async fn export_highlight_candidate(
+    app: tauri::AppHandle,
+    project_dir: String,
+    candidate_id: String,
+    mode: Option<String>,
+) -> Result<RenderClipResponse, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        export_highlight_candidate_internal(app, &project_dir, &candidate_id, mode)
+    })
+    .await
+    .map_err(|e| format!("Highlight export worker failed: {}", e))?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -358,6 +387,9 @@ pub fn run() {
             calibrate_chat_offset,
             run_stream_intelligence,
             load_stream_intelligence,
+            generate_highlight_candidates,
+            load_highlight_candidates,
+            export_highlight_candidate,
             save_project_file,
             load_project_file,
             cleanup_incomplete_files
