@@ -98,7 +98,7 @@ From exploring the streets to unexpected chaos, missions, driving and pure open-
 
 🛠️ Built for Gamers — ClipForge:
 I'm also building ClipForge, a high-performance open-source desktop tool designed to turn long gameplay sessions into vertical short-form clips. Powered natively by Rust and FFmpeg hardware acceleration.
-⭐ GitHub: https://github.com/aqueeb7/ClipForge
+⭐ GitHub: github.com/aqueeb7/ClipForge
 
 If you're into gaming, game dev, and open-source projects, consider following along!
 Like, share and subscribe for more Vice City action.`,
