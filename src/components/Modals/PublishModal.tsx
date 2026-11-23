@@ -868,8 +868,63 @@ Like, share and subscribe for more Vice City action.`,
 
                 {/* Success / Error Messages */}
                 <Show when={uploadError()}>
-                  <div class="p-3 rounded-lg bg-red-950/40 border border-red-800/40 text-xs text-red-300">
-                    {uploadError()}
+                  <div class="p-3.5 rounded-xl bg-red-950/40 border border-red-800/40 text-xs text-red-300 space-y-2.5">
+                    <div class="flex items-start gap-2.5">
+                      <AlertCircle size={16} class="text-amber-400 shrink-0 mt-0.5" />
+                      <div class="flex-1 min-w-0">
+                        <span class="font-bold text-red-200 block text-xs">
+                          {uploadError()?.includes("uploadLimitExceeded") || uploadError()?.includes("Daily Upload Limit")
+                            ? "YouTube Daily Upload Limit Hit (24h Cooldown)"
+                            : "Upload Error"}
+                        </span>
+                        <p class="text-zinc-300 text-[11px] mt-1 leading-relaxed">
+                          {uploadError()}
+                        </p>
+                      </div>
+                    </div>
+
+                    <Show when={uploadError()?.includes("uploadLimitExceeded") || uploadError()?.includes("Daily Upload Limit")}>
+                      <div class="pt-2.5 border-t border-red-900/40 space-y-2">
+                        <div class="text-[10px] text-zinc-400">
+                          <strong>Why this happens:</strong> YouTube limits daily uploads per channel (usually 5–15 uploads for standard accounts). It resets automatically 24 hours from your first upload. To increase limits, verify <em>Advanced features</em> in YouTube Studio.
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={handleFastLaunchYouTubeStudio}
+                            class="px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-medium text-[11px] cursor-pointer transition flex items-center gap-1.5 shadow-sm"
+                            title="Open YouTube Studio with title, description, and tags copied to clipboard"
+                          >
+                            <YouTubeIcon size={12} />
+                            <span>Manual Upload via YouTube Studio</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleFastLaunchTikTok}
+                            class="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[11px] cursor-pointer transition flex items-center gap-1.5"
+                          >
+                            <TikTokIcon size={12} />
+                            <span>Post to TikTok</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleFastLaunchInstagram}
+                            class="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[11px] cursor-pointer transition flex items-center gap-1.5"
+                          >
+                            <InstagramIcon size={12} />
+                            <span>Post to Reels</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleHighlightFile}
+                            class="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] cursor-pointer transition flex items-center gap-1"
+                          >
+                            <FolderOpen size={12} />
+                            <span>Show MP4 in Explorer</span>
+                          </button>
+                        </div>
+                      </div>
+                    </Show>
                   </div>
                 </Show>
 

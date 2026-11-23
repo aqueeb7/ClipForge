@@ -539,11 +539,37 @@ pub fn upload_to_youtube_internal(params: YouTubeUploadParams) -> Result<YouTube
     let upload_url = match location_url {
         Some(url) => url,
         None => {
+            let error_msg = if let Some(start) = init_header_str.find('{') {
+                if let Some(end) = init_header_str.rfind('}') {
+                    let json_str = &init_header_str[start..=end];
+                    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(json_str) {
+                        let reason = parsed.pointer("/error/errors/0/reason").and_then(|r| r.as_str());
+                        let message = parsed.pointer("/error/message").and_then(|m| m.as_str()).unwrap_or("Upload initiation rejected by YouTube.");
+
+                        match reason {
+                            Some("uploadLimitExceeded") => {
+                                "YouTube Daily Upload Limit Reached: Your channel has exceeded the maximum number of daily video uploads allowed by YouTube. YouTube limits daily uploads per account until verified with Advanced Features in YouTube Studio. The limit automatically resets in 24 hours.".to_string()
+                            }
+                            Some("quotaExceeded") => {
+                                "YouTube API Quota Exceeded: Your Google Cloud project quota has been reached for today. Quota resets at midnight Pacific Time.".to_string()
+                            }
+                            _ => format!("YouTube API Error: {}", message),
+                        }
+                    } else {
+                        format!("Could not acquire upload location URL. Response: {}", init_header_str)
+                    }
+                } else {
+                    format!("Could not acquire upload location URL. Response: {}", init_header_str)
+                }
+            } else {
+                format!("Could not acquire upload location URL. Response: {}", init_header_str)
+            };
+
             return Ok(YouTubeUploadResult {
                 success: false,
                 video_id: None,
                 url: None,
-                error: Some(format!("Could not acquire upload location URL. Response: {}", init_header_str)),
+                error: Some(error_msg),
             });
         }
     };
