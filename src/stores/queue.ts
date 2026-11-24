@@ -220,6 +220,13 @@ export async function runExportQueue(project: ClipForgeProject) {
       const gameplayMode = project.composition.gameplay.mode;
       const effectiveMode = gameplayMode === "cover" ? "crop" : bgMode;
 
+      const isShort = Boolean(
+        project.shorts?.some((s) => s.id === item.id) ||
+        item.id.startsWith("short_") ||
+        item.title.toLowerCase().includes("short")
+      );
+      const overlayEnabled = isShort ? false : (project.composition.overlay?.enabled ?? true);
+
       try {
         const res = await renderClip({
           clip_id: item.id,
@@ -233,10 +240,10 @@ export async function runExportQueue(project: ClipForgeProject) {
           bg_color: project.composition.background.color,
           crf: project.export.crf,
           preset: project.export.preset,
-          overlay_enabled: project.composition.overlay?.enabled ?? true,
-          brand_title: project.composition.overlay?.brandTitle || "CLIPFORGE",
-          episode_label: project.composition.overlay?.episodeLabel || "PART",
-          episode_index: item.episodeIndex
+          overlay_enabled: overlayEnabled,
+          brand_title: isShort ? undefined : (project.composition.overlay?.brandTitle || "CLIPFORGE"),
+          episode_label: isShort ? undefined : (project.composition.overlay?.episodeLabel || "PART"),
+          episode_index: isShort ? undefined : item.episodeIndex
         });
 
         if (res.success) {
@@ -333,6 +340,13 @@ export async function renderSingleClip(clip: Clip, project: ClipForgeProject) {
       }
     });
 
+    const isShort = Boolean(
+      project.shorts?.some((s) => s.id === clip.id) ||
+      clip.id.startsWith("short_") ||
+      clip.title.toLowerCase().includes("short")
+    );
+    const overlayEnabled = isShort ? false : (project.composition.overlay?.enabled ?? true);
+
     const item = queueItems[idx];
     const res = await renderClip({
       clip_id: item.id,
@@ -346,10 +360,10 @@ export async function renderSingleClip(clip: Clip, project: ClipForgeProject) {
       bg_color: project.composition.background.color,
       crf: project.export.crf,
       preset: project.export.preset,
-      overlay_enabled: project.composition.overlay?.enabled ?? true,
-      brand_title: project.composition.overlay?.brandTitle || "CLIPFORGE",
-      episode_label: project.composition.overlay?.episodeLabel || "PART",
-      episode_index: item.episodeIndex
+      overlay_enabled: overlayEnabled,
+      brand_title: isShort ? undefined : (project.composition.overlay?.brandTitle || "CLIPFORGE"),
+      episode_label: isShort ? undefined : (project.composition.overlay?.episodeLabel || "PART"),
+      episode_index: isShort ? undefined : item.episodeIndex
     });
 
     if (res.success) {

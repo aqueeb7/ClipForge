@@ -311,20 +311,24 @@ pub fn execute_render_task(
             }
         }
 
-        let label = req.episode_label.as_deref().unwrap_or("PART").trim().to_uppercase();
-        let ep_num_str = req.episode_index.map(|idx| format!("{:03}", idx)).unwrap_or_default();
-        let episode_text = if !ep_num_str.is_empty() {
-            format!("{} {}", label, ep_num_str)
-        } else {
-            label
-        };
+        if let Some(ref raw_label) = req.episode_label {
+            let label = raw_label.trim().to_uppercase();
+            if !label.is_empty() {
+                let ep_num_str = req.episode_index.map(|idx| format!("{:03}", idx)).unwrap_or_default();
+                let episode_text = if !ep_num_str.is_empty() {
+                    format!("{} {}", label, ep_num_str)
+                } else {
+                    label
+                };
 
-        if !episode_text.is_empty() {
-            let escaped_ep = escape_drawtext(&episode_text);
-            overlay_filters.push(format!(
-                "drawtext={}text='{}':fontcolor=yellow:fontsize=44:x=(w-text_w)/2:y=1720:box=1:boxcolor=black@0.6:boxborderw=10",
-                font_arg, escaped_ep
-            ));
+                if !episode_text.is_empty() {
+                    let escaped_ep = escape_drawtext(&episode_text);
+                    overlay_filters.push(format!(
+                        "drawtext={}text='{}':fontcolor=yellow:fontsize=44:x=(w-text_w)/2:y=1720:box=1:boxcolor=black@0.6:boxborderw=10",
+                        font_arg, escaped_ep
+                    ));
+                }
+            }
         }
     }
 

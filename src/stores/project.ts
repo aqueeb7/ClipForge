@@ -75,19 +75,19 @@ const isManualMode = createMemo(() => currentProject()?.clipSettings.mode === "m
 const isMasterStage = createMemo(() => timelineStage() === "master");
 const isPartsStage = createMemo(() => timelineStage() === "parts");
 const hasParts = createMemo(() => Boolean(currentManifest() && (currentManifest()?.clips.length ?? 0) > 0));
-const rawDuration = createMemo(() => videoMetadata()?.durationSeconds || 60);
+const rawDuration = createMemo(() => videoMetadata()?.durationSeconds || currentProject()?.sources.video?.durationSeconds || 60);
 const activeStreamDuration = createMemo(() =>
-  Math.max(0, (masterOutSeconds() || videoMetadata()?.durationSeconds || 60) - masterInSeconds())
+  Math.max(0, (masterOutSeconds() || videoMetadata()?.durationSeconds || currentProject()?.sources.video?.durationSeconds || 60) - masterInSeconds())
 );
 const trimmedIntroDuration = createMemo(() => masterInSeconds());
 const trimmedOutroDuration = createMemo(() => {
-  const dur = videoMetadata()?.durationSeconds || 60;
+  const dur = videoMetadata()?.durationSeconds || currentProject()?.sources.video?.durationSeconds || 60;
   const out = masterOutSeconds() || dur;
   return Math.max(0, dur - out);
 });
 const isIntroTrimmed = createMemo(() => masterInSeconds() > 0.5);
 const isOutroTrimmed = createMemo(() => {
-  const dur = videoMetadata()?.durationSeconds;
+  const dur = videoMetadata()?.durationSeconds || currentProject()?.sources.video?.durationSeconds;
   return Boolean(dur && masterOutSeconds() > 0 && masterOutSeconds() < dur - 0.5);
 });
 const isAudioAttached = createMemo(() => Boolean(audioMetadata()));

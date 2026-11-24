@@ -232,7 +232,7 @@ export const VideoPreview: Component = () => {
 
     const start = inp !== null ? inp : Math.max(0, curr - 5);
     const end = outp !== null && outp > start ? outp : Math.min(totalDuration(), start + 30);
-    const dur = Math.round(end - start);
+    const dur = Math.round((end - start) * 10) / 10;
     const title = `Short #${projectSignals.shortClips().length + 1} (${dur}s • ${currentTemplate().replace("_", " ").toUpperCase()})`;
 
     projectSignals.addShortClip(start, end, {

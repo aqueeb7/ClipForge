@@ -19,6 +19,17 @@ import {
   ChevronDown,
 } from "./Icons";
 
+interface TrimmingState {
+  id: string;
+  type: "short" | "part";
+  edge: "start" | "end";
+  initialMouseX: number;
+  initialStart: number;
+  initialEnd: number;
+  currentStart: number;
+  currentEnd: number;
+}
+
 export const TimelineScrubber: Component = () => {
   let timelineTrackRef: HTMLDivElement | undefined;
   let scrollContainerRef: HTMLDivElement | undefined;
@@ -26,8 +37,16 @@ export const TimelineScrubber: Component = () => {
   const [isDragging, setIsDragging] = createSignal(false);
   const [selectedShortId, setSelectedShortId] = createSignal<string | null>(null);
   const [showWorkflowMenu, setShowWorkflowMenu] = createSignal(false);
+  const [trimmingState, setTrimmingState] = createSignal<TrimmingState | null>(null);
 
-  const totalDuration = createMemo(() => projectSignals.videoMetadata()?.durationSeconds || 60);
+  const totalDuration = createMemo(() => {
+    const vMeta = projectSignals.videoMetadata()?.durationSeconds;
+    if (vMeta && vMeta > 0) return vMeta;
+    const pDur = projectSignals.currentProject()?.sources.video?.durationSeconds;
+    if (pDur && pDur > 0) return pDur;
+    return 60;
+  });
+
   const clips = createMemo(() => projectSignals.currentManifest()?.clips ?? []);
   const shorts = createMemo(() => projectSignals.shortClips());
   const composition = createMemo(() => projectSignals.currentProject()?.composition);
@@ -77,11 +96,13 @@ export const TimelineScrubber: Component = () => {
   }
 
   function handleTrackClick(e: MouseEvent) {
+    if (trimmingState()) return;
     const time = calculateTimeFromEvent(e);
     timelineSignals.setCurrentTime(time);
   }
 
   function startDrag(e: MouseEvent) {
+    if (trimmingState()) return;
     setIsDragging(true);
     handleTrackClick(e);
     window.addEventListener("mousemove", onDrag);
@@ -89,7 +110,7 @@ export const TimelineScrubber: Component = () => {
   }
 
   function onDrag(e: MouseEvent) {
-    if (!isDragging()) return;
+    if (!isDragging() || trimmingState()) return;
     const time = calculateTimeFromEvent(e);
     timelineSignals.setCurrentTime(time);
   }
@@ -112,7 +133,7 @@ export const TimelineScrubber: Component = () => {
 
     const start = inp !== null ? inp : Math.max(0, curr - 5);
     const end = outp !== null && outp > start ? outp : Math.min(totalDuration(), start + 30);
-    const dur = Math.round(end - start);
+    const dur = Math.round((end - start) * 10) / 10;
     const title = `Short #${shorts().length + 1} (${dur}s)`;
 
     projectSignals.addShortClip(start, end, {
@@ -123,11 +144,156 @@ export const TimelineScrubber: Component = () => {
     timelineSignals.clearMarkers();
   }
 
+  // Edge Dragging / Trimming Event Handlers
+  function onTrimmingMove(e: MouseEvent) {
+    const trim = trimmingState();
+    if (!trim || !timelineTrackRef) return;
+    const rect = timelineTrackRef.getBoundingClientRect();
+    const deltaX = e.clientX - trim.initialMouseX;
+    const dur = totalDuration();
+    const deltaTime = (deltaX / rect.width) * dur;
+
+    if (trim.type === "short") {
+      if (trim.edge === "start") {
+        const newStart = Math.max(0, Math.min(trim.initialEnd - 0.5, Math.round((trim.initialStart + deltaTime) * 10) / 10));
+        setTrimmingState({ ...trim, currentStart: newStart });
+        projectSignals.updateShortClip(trim.id, {
+          start: newStart,
+          duration: Math.round((trim.initialEnd - newStart) * 10) / 10
+        });
+        timelineSignals.setCurrentTime(newStart);
+      } else {
+        const newEnd = Math.max(trim.initialStart + 0.5, Math.min(dur, Math.round((trim.initialEnd + deltaTime) * 10) / 10));
+        setTrimmingState({ ...trim, currentEnd: newEnd });
+        projectSignals.updateShortClip(trim.id, {
+          end: newEnd,
+          duration: Math.round((newEnd - trim.initialStart) * 10) / 10
+        });
+        timelineSignals.setCurrentTime(newEnd);
+      }
+    } else if (trim.type === "part") {
+      const clipIndex = clips().findIndex((c) => c.id === trim.id);
+      if (clipIndex !== -1) {
+        const proj = projectSignals.currentProject();
+        if (proj && proj.clipSettings.mode !== "manual") {
+          projectSignals.setClippingMode("manual");
+        }
+        if (trim.edge === "start") {
+          const newStart = Math.max(0, Math.min(trim.initialEnd - 0.5, Math.round((trim.initialStart + deltaTime) * 10) / 10));
+          setTrimmingState({ ...trim, currentStart: newStart });
+          projectSignals.updateManualClipItem(clipIndex + 1, { start: newStart });
+          timelineSignals.setCurrentTime(newStart);
+        } else {
+          const newEnd = Math.max(trim.initialStart + 0.5, Math.min(dur, Math.round((trim.initialEnd + deltaTime) * 10) / 10));
+          setTrimmingState({ ...trim, currentEnd: newEnd });
+          projectSignals.updateManualClipItem(clipIndex + 1, { end: newEnd });
+          timelineSignals.setCurrentTime(newEnd);
+        }
+      }
+    }
+  }
+
+  function stopTrimming() {
+    setTrimmingState(null);
+    window.removeEventListener("mousemove", onTrimmingMove);
+    window.removeEventListener("mouseup", stopTrimming);
+  }
+
+  // Pixel-Perfect Ruler Ticks Memo
+  const rulerTicks = createMemo(() => {
+    const dur = totalDuration();
+    const zoom = timelineSignals.zoomLevel();
+    if (dur <= 0) return [];
+
+    const visibleDuration = dur / zoom;
+    const targetStep = visibleDuration / 10;
+    const steps = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200];
+    const step = steps.find((s) => s >= targetStep) || 3600;
+
+    const ticks: { time: number; label: string; pct: number }[] = [];
+    for (let t = 0; t <= dur; t += step) {
+      ticks.push({
+        time: t,
+        label: formatTime(t),
+        pct: (t / dur) * 100,
+      });
+    }
+
+    if (ticks.length === 0 || ticks[ticks.length - 1].time < dur - step * 0.25) {
+      ticks.push({
+        time: dur,
+        label: formatTime(dur),
+        pct: 100,
+      });
+    }
+    return ticks;
+  });
+
+  // Trackpad Pinch-to-Zoom & Touchscreen Pinch Gestures
+  createEffect(() => {
+    const el = scrollContainerRef;
+    if (!el) return;
+
+    function handleWheel(e: WheelEvent) {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        const currentZoom = timelineSignals.zoomLevel();
+        // deltaY < 0 is pinch-out (expand / zoom in), deltaY > 0 is pinch-in (squeeze / zoom out)
+        const zoomDelta = -e.deltaY * 0.01;
+        const newZoom = Math.max(1, Math.min(15, currentZoom + zoomDelta));
+        timelineSignals.setZoomLevel(Math.round(newZoom * 10) / 10);
+      }
+    }
+
+    let initialDist = 0;
+    let initialZoom = 1;
+
+    function handleTouchStart(e: TouchEvent) {
+      if (e.touches.length === 2) {
+        initialDist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        initialZoom = timelineSignals.zoomLevel();
+      }
+    }
+
+    function handleTouchMove(e: TouchEvent) {
+      if (e.touches.length === 2 && initialDist > 0) {
+        e.preventDefault();
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        const factor = dist / initialDist;
+        const newZoom = Math.max(1, Math.min(15, initialZoom * factor));
+        timelineSignals.setZoomLevel(Math.round(newZoom * 10) / 10);
+      }
+    }
+
+    function handleTouchEnd() {
+      initialDist = 0;
+    }
+
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    el.addEventListener("touchstart", handleTouchStart, { passive: false });
+    el.addEventListener("touchmove", handleTouchMove, { passive: false });
+    el.addEventListener("touchend", handleTouchEnd);
+
+    onCleanup(() => {
+      el.removeEventListener("wheel", handleWheel);
+      el.removeEventListener("touchstart", handleTouchStart);
+      el.removeEventListener("touchmove", handleTouchMove);
+      el.removeEventListener("touchend", handleTouchEnd);
+    });
+  });
+
+  // Auto-scroll track with playhead
   createEffect(() => {
     const time = timelineSignals.currentTime();
     const zoom = timelineSignals.zoomLevel();
     const dur = totalDuration();
-    if (zoom > 1 && scrollContainerRef && timelineTrackRef && !isDragging()) {
+    if (zoom > 1 && scrollContainerRef && timelineTrackRef && !isDragging() && !trimmingState()) {
       const trackWidth = timelineTrackRef.clientWidth;
       const playheadPx = (time / dur) * trackWidth;
       const visibleLeft = scrollContainerRef.scrollLeft;
@@ -141,6 +307,8 @@ export const TimelineScrubber: Component = () => {
   onCleanup(() => {
     window.removeEventListener("mousemove", onDrag);
     window.removeEventListener("mouseup", stopDrag);
+    window.removeEventListener("mousemove", onTrimmingMove);
+    window.removeEventListener("mouseup", stopTrimming);
   });
 
   const playheadPositionPercent = createMemo(() => {
@@ -166,14 +334,6 @@ export const TimelineScrubber: Component = () => {
   const hasChat = createMemo(() => chatReplaySignals.hasChat());
   const hasIntelligence = createMemo(() => intelligenceSignals.hasMoments());
 
-  // Dynamic layout offsets for stacked lanes:
-  // Ruler: 0 to 18px
-  // V1 Video / Parts: 18 to 46px (height 28)
-  // S1 Shorts / Highlights: 46 to 74px (height 28)
-  // T1 Titles & Brand: 74 to 96px (height 22)
-  // F1 Framing & Stacking: 96 to 118px (height 22)
-  // C1 Chat (if present): 118 to 142px (height 24)
-  // A1 Audio: bottom track (height 20)
   const totalTrackHeight = createMemo(() => {
     let h = 18 + 28 + 28 + 22 + 22 + 20; // 138px base
     if (hasChat()) h += 24;
@@ -238,7 +398,7 @@ export const TimelineScrubber: Component = () => {
                   }`}
                 >
                   <span>Highlight Shorts Studio</span>
-                  <span class="text-[9px] text-zinc-500">Fast 15s–60s viral short clips</span>
+                  <span class="text-[9px] text-zinc-500">Custom flexible viral short clips</span>
                 </button>
               </div>
             </Show>
@@ -351,15 +511,15 @@ export const TimelineScrubber: Component = () => {
             </button>
           </Show>
 
-          {/* Quick Create Short button on toolbar */}
+          {/* Create Short button on toolbar */}
           <button
             type="button"
             onClick={handleCreateQuickShort}
             class="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded text-[11px] font-semibold transition cursor-pointer flex items-center gap-1 shadow-sm"
-            title="Create a 30s short on the dedicated S1 track"
+            title="Create a custom vertical short on dedicated S1 track (uses In/Out markers if set)"
           >
             <Plus size={11} />
-            <span>+ 30s Short</span>
+            <span>+ Create Short</span>
           </button>
         </div>
 
@@ -425,14 +585,14 @@ export const TimelineScrubber: Component = () => {
             </button>
           </Show>
 
-          {/* Zoom Control */}
+          {/* Zoom Control with Pinch Note */}
           <div class="flex items-center gap-1.5 bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800">
-            <span class="text-[10px] uppercase font-mono text-zinc-500">Zoom</span>
+            <span class="text-[10px] uppercase font-mono text-zinc-500" title="Use two-finger trackpad pinch to zoom">Zoom</span>
             <button
               type="button"
               onClick={timelineSignals.zoomOut}
               class="w-4 h-4 text-zinc-400 hover:text-zinc-200 text-xs font-mono cursor-pointer"
-              title="Zoom Out"
+              title="Zoom Out (-)"
             >
               -
             </button>
@@ -449,7 +609,7 @@ export const TimelineScrubber: Component = () => {
               type="button"
               onClick={timelineSignals.zoomIn}
               class="w-4 h-4 text-zinc-400 hover:text-zinc-200 text-xs font-mono cursor-pointer"
-              title="Zoom In"
+              title="Zoom In (+)"
             >
               +
             </button>
@@ -484,14 +644,29 @@ export const TimelineScrubber: Component = () => {
           }}
           onMouseDown={startDrag}
         >
-          {/* ===================== ROW 0: TIME RULER ===================== */}
-          <div class="absolute inset-x-0 top-0 h-[18px] bg-zinc-900/90 border-b border-zinc-800/80 flex justify-between px-2 text-[9px] font-mono text-zinc-500 pointer-events-none z-10">
-            <span>0:00</span>
-            <span>{formatTime(totalDuration() * 0.2)}</span>
-            <span>{formatTime(totalDuration() * 0.4)}</span>
-            <span>{formatTime(totalDuration() * 0.6)}</span>
-            <span>{formatTime(totalDuration() * 0.8)}</span>
-            <span>{formatTime(totalDuration())}</span>
+          {/* ===================== ROW 0: PIXEL-PERFECT TIME RULER ===================== */}
+          <div class="absolute inset-x-0 top-0 h-[18px] bg-zinc-900/90 border-b border-zinc-800/80 pointer-events-none z-10 overflow-hidden">
+            <For each={rulerTicks()}>
+              {(tick) => (
+                <div
+                  class="absolute top-0 bottom-0 flex flex-col items-center"
+                  style={{
+                    left: `${tick.pct}%`,
+                    transform:
+                      tick.pct > 95
+                        ? "translateX(-90%)"
+                        : tick.pct < 5
+                        ? "translateX(0%)"
+                        : "translateX(-50%)",
+                  }}
+                >
+                  <div class="w-px h-1.5 bg-zinc-500" />
+                  <span class="text-[8px] font-mono text-zinc-400 select-none leading-none mt-0.5">
+                    {tick.label}
+                  </span>
+                </div>
+              )}
+            </For>
           </div>
 
           {/* ===================== ROW 1: TRACK V1 (VIDEO & PARTS) ===================== */}
@@ -536,7 +711,7 @@ export const TimelineScrubber: Component = () => {
                   class="absolute top-1 rounded bg-blue-950/60 border border-blue-600/60 h-6 flex items-center justify-between px-2 text-[10px] font-mono text-blue-200 overflow-hidden"
                   style={{
                     left: `${masterInPercent()}%`,
-                    width: `${Math.max(1, masterOutPercent() - masterInPercent())}%`,
+                    width: `${Math.max(0.5, masterOutPercent() - masterInPercent())}%`,
                   }}
                 >
                   <span class="font-semibold text-zinc-100 truncate">Full Stream Master</span>
@@ -547,9 +722,13 @@ export const TimelineScrubber: Component = () => {
               <For each={clips()}>
                 {(clip, index) => {
                   const isSelected = () => clip.id === timelineSignals.selectedClipId();
+                  const leftPct = () => (clip.sourceStartSeconds / totalDuration()) * 100;
+                  const widthPct = () =>
+                    ((clip.sourceEndSeconds - clip.sourceStartSeconds) / totalDuration()) * 100;
+
                   return (
                     <div
-                      class={`absolute top-1 rounded border transition-all flex items-center justify-between px-2 overflow-hidden text-[10px] font-mono cursor-pointer h-6 ${
+                      class={`absolute top-1 rounded border transition-all flex items-center justify-between px-2 overflow-hidden text-[10px] font-mono cursor-pointer h-6 group/clip ${
                         isSelected()
                           ? "bg-blue-600 border-blue-300 text-white font-semibold shadow-md z-20"
                           : index() % 2 === 0
@@ -557,22 +736,66 @@ export const TimelineScrubber: Component = () => {
                           : "bg-zinc-850 border-zinc-700/70 text-zinc-300 hover:bg-zinc-700/80"
                       }`}
                       style={{
-                        left: `${(clip.sourceStartSeconds / totalDuration()) * 100}%`,
-                        width: `${Math.max(
-                          0.6,
-                          ((clip.sourceEndSeconds - clip.sourceStartSeconds) / totalDuration()) * 100
-                        )}%`,
+                        left: `${leftPct()}%`,
+                        width: `${widthPct()}%`,
+                        "min-width": "12px",
                       }}
                       onClick={(e) => {
                         e.stopPropagation();
                         selectClip(clip.id, clip.sourceStartSeconds);
                       }}
-                      title={`${clip.title}: ${formatTime(clip.sourceStartSeconds)} - ${formatTime(clip.sourceEndSeconds)}`}
+                      title={`${clip.title}: ${formatTime(clip.sourceStartSeconds)} - ${formatTime(clip.sourceEndSeconds)} (Hover edges to trim)`}
                     >
-                      <span class="truncate">{clip.title}</span>
-                      <span class="text-[9px] opacity-75 ml-1">
+                      {/* Left Trim Handle */}
+                      <div
+                        class="absolute left-0 top-0 bottom-0 w-2.5 cursor-ew-resize hover:bg-blue-300/40 z-30 group/handle flex items-center justify-center transition-colors"
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          setTrimmingState({
+                            id: clip.id,
+                            type: "part",
+                            edge: "start",
+                            initialMouseX: e.clientX,
+                            initialStart: clip.sourceStartSeconds,
+                            initialEnd: clip.sourceEndSeconds,
+                            currentStart: clip.sourceStartSeconds,
+                            currentEnd: clip.sourceEndSeconds,
+                          });
+                          window.addEventListener("mousemove", onTrimmingMove);
+                          window.addEventListener("mouseup", stopTrimming);
+                        }}
+                        title="Drag to expand/reduce part start"
+                      >
+                        <div class="w-0.5 h-3 rounded-full bg-white/40 group-hover/handle:bg-white" />
+                      </div>
+
+                      <span class="truncate pl-1.5">{clip.title}</span>
+                      <span class="text-[9px] opacity-75 ml-1 pr-1.5">
                         {formatTime(clip.sourceEndSeconds - clip.sourceStartSeconds)}
                       </span>
+
+                      {/* Right Trim Handle */}
+                      <div
+                        class="absolute right-0 top-0 bottom-0 w-2.5 cursor-ew-resize hover:bg-blue-300/40 z-30 group/handle flex items-center justify-center transition-colors"
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          setTrimmingState({
+                            id: clip.id,
+                            type: "part",
+                            edge: "end",
+                            initialMouseX: e.clientX,
+                            initialStart: clip.sourceStartSeconds,
+                            initialEnd: clip.sourceEndSeconds,
+                            currentStart: clip.sourceStartSeconds,
+                            currentEnd: clip.sourceEndSeconds,
+                          });
+                          window.addEventListener("mousemove", onTrimmingMove);
+                          window.addEventListener("mouseup", stopTrimming);
+                        }}
+                        title="Drag to expand/reduce part end"
+                      >
+                        <div class="w-0.5 h-3 rounded-full bg-white/40 group-hover/handle:bg-white" />
+                      </div>
                     </div>
                   );
                 }}
@@ -596,7 +819,7 @@ export const TimelineScrubber: Component = () => {
               when={shorts().length > 0}
               fallback={
                 <div class="absolute inset-x-0 top-1.5 flex items-center justify-center text-[9px] font-mono text-zinc-600 border border-dashed border-zinc-800/60 rounded h-5 mx-24 pointer-events-none">
-                  <span>+ Create Short (30s vertical clips will populate this dedicated lane)</span>
+                  <span>+ Create Short (Custom vertical short clips will populate this dedicated lane)</span>
                 </div>
               }
             >
@@ -604,11 +827,12 @@ export const TimelineScrubber: Component = () => {
                 {(short) => {
                   const isSelected = () => short.id === selectedShortId();
                   const leftPct = () => (short.start / totalDuration()) * 100;
-                  const widthPct = () => Math.max(0.8, ((short.end - short.start) / totalDuration()) * 100);
+                  const widthPct = () => ((short.end - short.start) / totalDuration()) * 100;
+                  const durSec = () => Math.max(0.1, short.end - short.start);
 
                   return (
                     <div
-                      class={`absolute top-1 rounded border flex items-center justify-between px-2 overflow-hidden text-[10px] font-mono cursor-pointer h-6 transition-all z-20 ${
+                      class={`absolute top-1 rounded border flex items-center justify-between px-2 overflow-hidden text-[10px] font-mono cursor-pointer h-6 transition-all z-20 group/short ${
                         isSelected()
                           ? "bg-amber-500 text-black border-white font-bold shadow-lg shadow-amber-500/40"
                           : "bg-amber-950/80 border-amber-600/70 text-amber-200 hover:bg-amber-900/80"
@@ -616,6 +840,7 @@ export const TimelineScrubber: Component = () => {
                       style={{
                         left: `${leftPct()}%`,
                         width: `${widthPct()}%`,
+                        "min-width": "14px",
                       }}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -623,14 +848,38 @@ export const TimelineScrubber: Component = () => {
                         setSelectedShortId(short.id);
                         timelineSignals.setViewMode("vertical");
                       }}
-                      title={`${short.title}: ${formatTime(short.start)} - ${formatTime(short.end)} • Template: ${short.framingTemplate}`}
+                      title={`${short.title}: ${formatTime(short.start)} - ${formatTime(short.end)} • Template: ${short.framingTemplate} (Hover edges to trim)`}
                     >
-                      <div class="flex items-center gap-1 truncate">
+                      {/* Left Edge Trim Handle (Expand / Reduce Start) */}
+                      <div
+                        class="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-white/40 active:bg-white/70 z-30 group/handle flex items-center justify-center transition-colors"
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          setTrimmingState({
+                            id: short.id,
+                            type: "short",
+                            edge: "start",
+                            initialMouseX: e.clientX,
+                            initialStart: short.start,
+                            initialEnd: short.end,
+                            currentStart: short.start,
+                            currentEnd: short.end,
+                          });
+                          window.addEventListener("mousemove", onTrimmingMove);
+                          window.addEventListener("mouseup", stopTrimming);
+                        }}
+                        title="Drag left/right to expand or reduce short start"
+                      >
+                        <div class="w-1 h-3 rounded-full bg-white/70 group-hover/handle:bg-white shadow-sm" />
+                      </div>
+
+                      <div class="flex items-center gap-1 truncate pl-2">
                         <span class="truncate">✂️ {short.title}</span>
                       </div>
-                      <div class="flex items-center gap-1 shrink-0 ml-1">
+
+                      <div class="flex items-center gap-1 shrink-0 ml-1 pr-2">
                         <span class="text-[9px] px-1 rounded bg-black/40 text-amber-300 font-mono">
-                          {short.duration.toFixed(0)}s
+                          {durSec().toFixed(1)}s
                         </span>
                         <button
                           type="button"
@@ -643,6 +892,29 @@ export const TimelineScrubber: Component = () => {
                         >
                           &times;
                         </button>
+                      </div>
+
+                      {/* Right Edge Trim Handle (Expand / Reduce End) */}
+                      <div
+                        class="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-white/40 active:bg-white/70 z-30 group/handle flex items-center justify-center transition-colors"
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          setTrimmingState({
+                            id: short.id,
+                            type: "short",
+                            edge: "end",
+                            initialMouseX: e.clientX,
+                            initialStart: short.start,
+                            initialEnd: short.end,
+                            currentStart: short.start,
+                            currentEnd: short.end,
+                          });
+                          window.addEventListener("mousemove", onTrimmingMove);
+                          window.addEventListener("mouseup", stopTrimming);
+                        }}
+                        title="Drag left/right to expand or reduce short end"
+                      >
+                        <div class="w-1 h-3 rounded-full bg-white/70 group-hover/handle:bg-white shadow-sm" />
                       </div>
                     </div>
                   );
@@ -666,7 +938,7 @@ export const TimelineScrubber: Component = () => {
                 class="absolute top-1 h-4 rounded bg-sky-950/80 border border-sky-700/60 flex items-center px-2 text-[9px] font-mono text-sky-200 truncate pointer-events-none"
                 style={{
                   left: `${masterInPercent()}%`,
-                  width: `${Math.max(2, masterOutPercent() - masterInPercent())}%`,
+                  width: `${Math.max(1, masterOutPercent() - masterInPercent())}%`,
                 }}
               >
                 <span class="truncate">🏷️ {composition()?.overlay?.brandTitle || "CLIPFORGE"} • {composition()?.overlay?.episodeLabel || "PART"} #Shorts</span>
@@ -688,7 +960,7 @@ export const TimelineScrubber: Component = () => {
               class="absolute top-1 h-4 rounded bg-purple-950/80 border border-purple-700/60 flex items-center px-2 text-[9px] font-mono text-purple-200 truncate pointer-events-none"
               style={{
                 left: `${masterInPercent()}%`,
-                width: `${Math.max(2, masterOutPercent() - masterInPercent())}%`,
+                width: `${Math.max(1, masterOutPercent() - masterInPercent())}%`,
               }}
             >
               <span class="truncate">
@@ -736,7 +1008,8 @@ export const TimelineScrubber: Component = () => {
                         style={{
                           position: "absolute",
                           left: `${(b.bin_start / totalDuration()) * 100}%`,
-                          width: `${Math.max(0.15, (5.0 / totalDuration()) * 100)}%`,
+                          width: `${(5.0 / totalDuration()) * 100}%`,
+                          "min-width": "2px",
                           height: `${heightPx()}px`,
                           bottom: "1px",
                         }}
@@ -767,6 +1040,29 @@ export const TimelineScrubber: Component = () => {
             </span>
             <span class="text-zinc-500">{formatTime(totalDuration())}</span>
           </div>
+
+          {/* Active Trimming Feedback Badge */}
+          <Show when={trimmingState()}>
+            {(trim) => {
+              const activeTime = () => (trim().edge === "start" ? trim().currentStart : trim().currentEnd);
+              const activeDuration = () => Math.max(0.1, trim().currentEnd - trim().currentStart);
+              const activePct = () => (activeTime() / totalDuration()) * 100;
+
+              return (
+                <div
+                  class="absolute top-6 z-40 px-2 py-0.5 rounded bg-blue-600 text-white text-[10px] font-mono font-bold shadow-xl border border-white/40 pointer-events-none transition-all flex items-center gap-1"
+                  style={{
+                    left: `${activePct()}%`,
+                    transform: "translateX(-50%)",
+                  }}
+                >
+                  <span>{trim().edge === "start" ? "Trim In:" : "Trim Out:"}</span>
+                  <span class="text-yellow-200">{formatPreciseTime(activeTime())}</span>
+                  <span class="opacity-80">({activeDuration().toFixed(1)}s)</span>
+                </div>
+              );
+            }}
+          </Show>
 
           {/* In/Out Selection Range Overlay */}
           <Show

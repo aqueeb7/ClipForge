@@ -110,14 +110,19 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
   }
 
   function handleAddQuickShort() {
+    const inp = timelineSignals.inPoint();
+    const outp = timelineSignals.outPoint();
     const cur = timelineSignals.currentTime();
-    const max = projectSignals.videoMetadata()?.durationSeconds || cur + 30;
-    const end = Math.min(cur + 30, max);
-    projectSignals.addShortClip(cur, end, {
-      title: `Highlight Short #${shortClips().length + 1}`,
+    const max = projectSignals.videoMetadata()?.durationSeconds || projectSignals.currentProject()?.sources.video?.durationSeconds || cur + 30;
+    const start = inp !== null ? inp : cur;
+    const end = outp !== null && outp > start ? outp : Math.min(cur + 30, max);
+    const dur = Math.round((end - start) * 10) / 10;
+    projectSignals.addShortClip(start, end, {
+      title: `Short #${shortClips().length + 1} (${dur}s)`,
       framingTemplate: "stacked_split",
       stacking: { template: "stacked_split", topHeightPercent: 35 }
     });
+    timelineSignals.clearMarkers();
   }
 
   function getActiveQueueItem(clipId: string) {
@@ -175,10 +180,10 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                 type="button"
                 onClick={handleAddQuickShort}
                 class="px-2.5 py-1 bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 rounded text-xs font-medium cursor-pointer transition flex items-center gap-1.5 border border-amber-800/60 shadow-sm"
-                title="Create 30s short from current playhead position"
+                title="Create custom short (uses timeline In/Out markers if set)"
               >
                 <Plus size={12} class="text-amber-400" />
-                <span>+ 30s Short</span>
+                <span>+ Create Short</span>
               </button>
 
               <Show when={renderedShortsCount() > 0}>
@@ -258,7 +263,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                   <Film size={22} class="text-zinc-600" />
                   <span class="font-semibold text-zinc-400">No vertical shorts created yet</span>
                   <p class="text-[10px] text-zinc-500 max-w-sm">
-                    Click <span class="text-amber-400 font-semibold">+ 30s Short</span> above or use the Studio Preview selection tool to isolate viral moments and stack video frames into 9:16 vertical shorts.
+                    Click <span class="text-amber-400 font-semibold">+ Create Short</span> above or use the Studio Preview selection tool to isolate viral moments and stack video frames into 9:16 vertical shorts.
                   </p>
                 </div>
               }
