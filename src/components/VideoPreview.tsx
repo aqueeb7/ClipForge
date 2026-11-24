@@ -232,9 +232,14 @@ export const VideoPreview: Component = () => {
 
     const start = inp !== null ? inp : Math.max(0, curr - 5);
     const end = outp !== null && outp > start ? outp : Math.min(totalDuration(), start + 30);
-    const title = `Short (${currentTemplate().replace("_", " ").toUpperCase()}) @ ${Math.round(start)}s`;
+    const dur = Math.round(end - start);
+    const title = `Short #${projectSignals.shortClips().length + 1} (${dur}s • ${currentTemplate().replace("_", " ").toUpperCase()})`;
 
-    projectSignals.addManualClipRange(start, end, title);
+    projectSignals.addShortClip(start, end, {
+      title,
+      framingTemplate: currentTemplate(),
+      stacking: stacking(),
+    });
     projectSignals.setWorkspaceTab("edit");
   }
 

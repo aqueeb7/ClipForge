@@ -14,6 +14,7 @@ export const ClipForgeProjectSchema = z.object({
   id: z.string().min(1, "Project ID cannot be empty"),
   name: z.string().min(1, "Project name cannot be empty"),
   version: z.literal(1).default(1),
+  workflowMode: z.enum(["episodic", "shorts", "hybrid"]).optional().default("hybrid"),
 
   sources: z.object({
     video: MediaSourceSchema,
@@ -23,6 +24,7 @@ export const ClipForgeProjectSchema = z.object({
   synchronization: SynchronizationSettingsSchema.default({ audioOffsetMs: 0 }),
   clipSettings: ClipSettingsSchema,
   composition: CompositionSettingsSchema.default({}),
+  shorts: z.array(z.any()).optional().default([]),
   export: ExportSettingsSchema
 });
 

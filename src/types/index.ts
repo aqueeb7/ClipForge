@@ -106,14 +106,36 @@ export interface ExportSettings {
   structure: ExportStructure;
 }
 
+export type WorkflowMode = "episodic" | "shorts" | "hybrid";
+
+export interface ShortClipItem {
+  id: string;
+  title: string;
+  start: number;
+  end: number;
+  duration: number;
+  framingTemplate: FramingTemplate;
+  stacking?: StackingSettings;
+  headerTitle?: string;
+  brandTitle?: string;
+  source?: "manual" | "intelligence" | "chat_spike";
+  confidence?: number;
+  outputName?: string;
+  status?: "pending" | "rendering" | "completed" | "failed";
+  outputPath?: string;
+  renderedBytes?: number;
+}
+
 export interface ClipForgeProject {
   id: string;
   name: string;
   version: 1;
+  workflowMode?: WorkflowMode;
   sources: ProjectSources;
   synchronization: SynchronizationSettings;
   clipSettings: ClipSettings;
   composition: CompositionSettings;
+  shorts?: ShortClipItem[];
   export: ExportSettings;
 }
 

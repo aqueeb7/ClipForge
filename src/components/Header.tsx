@@ -1,7 +1,7 @@
 import { Component, Show, createMemo } from "solid-js";
 import { projectSignals } from "../stores/project";
 import { queueSignals } from "../stores/queue";
-import { Cpu, Settings, HelpCircle, Plus, Film, Scissors, Download, CheckCircle2, FolderOpen } from "./Icons";
+import { Cpu, Settings, HelpCircle, Plus, Film, Scissors, Download, CheckCircle2, FolderOpen, Save } from "./Icons";
 
 interface HeaderProps {
   onOpenSettings: () => void;
@@ -50,6 +50,12 @@ export const Header: Component<HeaderProps> = (props) => {
             />
             <span class="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400">
               Saved
+            </span>
+            <span
+              class="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-blue-950/70 border border-blue-800/60 text-blue-300 font-semibold"
+              title={`Active Project Workflow Mode: ${projectSignals.workflowMode()}`}
+            >
+              {projectSignals.workflowMode()}
             </span>
           </Show>
         </div>
@@ -133,8 +139,20 @@ export const Header: Component<HeaderProps> = (props) => {
         </button>
       </nav>
 
-      {/* Right: Actions (Projects, New Project, Settings, Shortcuts) */}
+      {/* Right: Actions (Save & Close, Projects, New Project, Settings, Shortcuts) */}
       <div class="flex items-center gap-1.5">
+        <Show when={currentProject() || projectSignals.videoMetadata()}>
+          <button
+            type="button"
+            onClick={() => projectSignals.saveAndCloseProject(() => props.onOpenProjectManager())}
+            class="h-7 px-2.5 rounded bg-emerald-950/70 hover:bg-emerald-900/90 border border-emerald-700/60 text-emerald-300 hover:text-white text-xs font-semibold cursor-pointer transition flex items-center gap-1.5 shadow-sm"
+            title="Save and close current session at exact playhead frame, then switch projects"
+          >
+            <Save size={13} class="text-emerald-400" />
+            <span class="hidden sm:inline">Save & Close</span>
+          </button>
+        </Show>
+
         <button
           type="button"
           onClick={props.onOpenProjectManager}

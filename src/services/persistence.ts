@@ -1,4 +1,4 @@
-import type { ClipForgeProject } from "../types/index.js";
+import type { ClipForgeProject, ShortClipItem, WorkflowMode } from "../types/index.js";
 import type { MediaMetadata } from "./api.js";
 
 const SESSION_STORAGE_KEY = "clipforge_active_session_v1";
@@ -14,6 +14,9 @@ export interface SavedProjectDraft {
   videoPath?: string;
   audioPath?: string;
   clipsCount: number;
+  shortsCount?: number;
+  workflowMode?: WorkflowMode;
+  resumeTime?: number;
   candidatesCount: number;
   hasChat: boolean;
   status: "draft" | "in_progress" | "ready";
@@ -77,6 +80,8 @@ export interface SessionSnapshot {
   masterOutSeconds: number;
   isMasterPatched: boolean;
   timelineStage: "master" | "parts";
+  workflowMode?: WorkflowMode;
+  shortClips?: ShortClipItem[];
   activeWorkspaceTab: "media" | "edit" | "deliver";
   isVideoAudioMuted: boolean;
   isDedicatedAudioMuted: boolean;

@@ -6,8 +6,11 @@ import type {
   CompositionSettings,
   ExportSettings,
   ManualClipItem,
-  StackingSettings
+  StackingSettings,
+  ShortClipItem,
+  WorkflowMode
 } from "../types/index.js";
+import { timelineSignals } from "./timeline.js";
 import {
   checkEnvironment,
   inspectSource,
@@ -53,6 +56,8 @@ const [masterInSeconds, setMasterInSecondsState] = createSignal<number>(0);
 const [masterOutSeconds, setMasterOutSecondsState] = createSignal<number>(0);
 const [isMasterPatched, setIsMasterPatched] = createSignal<boolean>(false);
 const [timelineStage, setTimelineStageState] = createSignal<"master" | "parts">("master");
+const [workflowMode, setWorkflowModeState] = createSignal<WorkflowMode>("hybrid");
+const [shortClips, setShortClips] = createSignal<ShortClipItem[]>([]);
 const [activeWorkspaceTab, setActiveWorkspaceTabState] = createSignal<"media" | "edit" | "deliver">("edit");
 const [isVideoAudioMuted, setIsVideoAudioMuted] = createSignal<boolean>(false);
 const [isDedicatedAudioMuted, setIsDedicatedAudioMuted] = createSignal<boolean>(false);
@@ -519,6 +524,77 @@ function updateClipSettings(settings: Partial<AutomaticClipSettings>) {
   generatePlan();
 }
 
+function setWorkflowMode(mode: WorkflowMode) {
+  setWorkflowModeState(mode);
+  const proj = currentProject();
+  if (proj) {
+    setCurrentProject({ ...proj, workflowMode: mode });
+  }
+  setIsDirty(true);
+}
+
+function addShortClip(start: number, end: number, options?: Partial<ShortClipItem>): ShortClipItem {
+  const dur = Math.max(1, end - start);
+  const id = `short_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const title = options?.title || `Short #${shortClips().length + 1} (${Math.round(dur)}s)`;
+  const template = options?.framingTemplate || currentProject()?.composition?.stacking?.template || "blur_fill";
+  const stacking = options?.stacking || currentProject()?.composition?.stacking;
+
+  const newShort: ShortClipItem = {
+    id,
+    title,
+    start,
+    end,
+    duration: dur,
+    framingTemplate: template,
+    stacking,
+    headerTitle: options?.headerTitle || currentProject()?.composition?.overlay?.brandTitle || "CLIPFORGE",
+    brandTitle: options?.brandTitle || "#Shorts",
+    source: options?.source || "manual",
+    confidence: options?.confidence,
+    outputName: options?.outputName || `${title.replace(/[^a-zA-Z0-9_-]/g, "_")}.mp4`,
+    status: "pending",
+  };
+
+  setShortClips((prev) => [...prev, newShort]);
+  const proj = currentProject();
+  if (proj) {
+    setCurrentProject({ ...proj, shorts: shortClips() });
+  }
+  setIsDirty(true);
+  autoSave(timelineSignals.currentTime(), timelineSignals.zoomLevel());
+  return newShort;
+}
+
+function removeShortClip(id: string) {
+  setShortClips((prev) => prev.filter((s) => s.id !== id));
+  const proj = currentProject();
+  if (proj) {
+    setCurrentProject({ ...proj, shorts: shortClips() });
+  }
+  setIsDirty(true);
+}
+
+function updateShortClip(id: string, updates: Partial<ShortClipItem>) {
+  setShortClips((prev) =>
+    prev.map((s) => (s.id === id ? { ...s, ...updates } : s))
+  );
+  const proj = currentProject();
+  if (proj) {
+    setCurrentProject({ ...proj, shorts: shortClips() });
+  }
+  setIsDirty(true);
+}
+
+function clearShortClips() {
+  setShortClips([]);
+  const proj = currentProject();
+  if (proj) {
+    setCurrentProject({ ...proj, shorts: [] });
+  }
+  setIsDirty(true);
+}
+
 function updateComposition(composition: {
   width?: 1080;
   height?: 1920;
@@ -686,6 +762,8 @@ function autoSave(currentTime = 0, zoomLevel = 1, isTimelineExpanded = false) {
     masterOutSeconds: masterOutSeconds(),
     isMasterPatched: isMasterPatched(),
     timelineStage: timelineStage(),
+    workflowMode: workflowMode(),
+    shortClips: shortClips(),
     activeWorkspaceTab: activeWorkspaceTab(),
     isVideoAudioMuted: isVideoAudioMuted(),
     isDedicatedAudioMuted: isDedicatedAudioMuted(),
@@ -704,6 +782,9 @@ function autoSave(currentTime = 0, zoomLevel = 1, isTimelineExpanded = false) {
       videoPath: proj.sources.video?.path,
       audioPath: proj.sources.audio?.path,
       clipsCount: currentManifest()?.clips?.length || (proj.clipSettings.mode === "manual" ? proj.clipSettings.clips.length : 0),
+      shortsCount: shortClips().length,
+      workflowMode: workflowMode(),
+      resumeTime: currentTime,
       candidatesCount: 0,
       hasChat: false,
       status: "in_progress",
@@ -727,6 +808,12 @@ async function restoreAutoSavedSession(): Promise<boolean> {
     setMasterOutSecondsState(snapshot.masterOutSeconds || snapshot.videoMetadata?.durationSeconds || 60);
     setIsMasterPatched(snapshot.isMasterPatched || false);
     setTimelineStageState(snapshot.timelineStage || "master");
+    if (snapshot.workflowMode) {
+      setWorkflowModeState(snapshot.workflowMode);
+    }
+    if (snapshot.shortClips && Array.isArray(snapshot.shortClips)) {
+      setShortClips(snapshot.shortClips);
+    }
     setActiveWorkspaceTabState(snapshot.activeWorkspaceTab || "edit");
     setIsVideoAudioMuted(snapshot.isVideoAudioMuted || false);
     setIsDedicatedAudioMuted(snapshot.isDedicatedAudioMuted || false);
@@ -746,6 +833,13 @@ async function restoreAutoSavedSession(): Promise<boolean> {
       generatePlan();
     }
 
+    if (snapshot.currentTime !== undefined && snapshot.currentTime > 0) {
+      timelineSignals.setCurrentTime(snapshot.currentTime);
+    }
+    if (snapshot.zoomLevel !== undefined) {
+      timelineSignals.setZoomLevel(snapshot.zoomLevel);
+    }
+
     setStatusMessage("Session restored successfully.");
     return true;
   } catch (err) {
@@ -756,7 +850,13 @@ async function restoreAutoSavedSession(): Promise<boolean> {
   }
 }
 
-function createNewProject(options?: { name?: string; durationSeconds?: number; outputDirectory?: string }) {
+async function saveAndCloseProject(onClosed?: () => void) {
+  const t = timelineSignals.currentTime();
+  const z = timelineSignals.zoomLevel();
+  const exp = timelineSignals.isTimelineExpanded();
+  autoSave(t, z, exp);
+
+  // Clear active workspace
   clearSessionState();
   setCurrentProject(null);
   setVideoMetadata(null);
@@ -768,6 +868,32 @@ function createNewProject(options?: { name?: string; durationSeconds?: number; o
   setMasterOutSecondsState(0);
   setIsMasterPatched(false);
   setTimelineStageState("master");
+  setShortClips([]);
+  setProjectFilePath(null);
+  setStreamProjectDirState(null);
+  setIsDirty(false);
+  timelineSignals.setCurrentTime(0);
+
+  setStatusMessage("Project saved and closed.");
+  if (onClosed) {
+    onClosed();
+  }
+}
+
+function createNewProject(options?: { name?: string; durationSeconds?: number; outputDirectory?: string; workflowMode?: WorkflowMode }) {
+  clearSessionState();
+  setCurrentProject(null);
+  setVideoMetadata(null);
+  setAudioMetadata(null);
+  setCurrentManifest(null);
+  setVideoAssetUrl(null);
+  setAudioAssetUrl(null);
+  setMasterInSecondsState(0);
+  setMasterOutSecondsState(0);
+  setIsMasterPatched(false);
+  setTimelineStageState("master");
+  setWorkflowModeState(options?.workflowMode || "hybrid");
+  setShortClips([]);
   setActiveWorkspaceTabState("media");
   setProjectFilePath(null);
   setIsDirty(false);
@@ -863,6 +989,14 @@ async function openProject(filePath?: string): Promise<boolean> {
       await loadAudioSource(proj.sources.audio.path);
     }
 
+    if (proj.workflowMode) {
+      setWorkflowModeState(proj.workflowMode);
+    }
+
+    if (proj.shorts && Array.isArray(proj.shorts)) {
+      setShortClips(proj.shorts);
+    }
+
     if (proj.clipSettings.mode === "automatic") {
       setMasterInSecondsState(proj.clipSettings.startSeconds ?? 0);
       setMasterOutSecondsState(
@@ -925,6 +1059,14 @@ export const projectSignals = {
   streamProjectDir,
   setStreamProjectDir: setStreamProjectDirState,
   isDirty,
+  workflowMode,
+  setWorkflowMode,
+  shortClips,
+  addShortClip,
+  removeShortClip,
+  updateShortClip,
+  clearShortClips,
+  saveAndCloseProject,
 
   // Memos
   hasProject,

@@ -1,5 +1,6 @@
 import { Component, createSignal, createMemo, Show, For } from "solid-js";
 import { projectSignals } from "../../stores/project";
+import { timelineSignals } from "../../stores/timeline";
 import { getSavedDrafts, deleteProjectDraft, type SavedProjectDraft } from "../../services/persistence";
 import { openInExplorer, isTauriEnvironment } from "../../services/api";
 import {
@@ -14,6 +15,7 @@ import {
   X,
   Sparkles,
   Film,
+  Save,
 } from "../Icons";
 
 interface ProjectManagerModalProps {
@@ -33,6 +35,12 @@ export const ProjectManagerModal: Component<ProjectManagerModalProps> = (props) 
     }
   });
 
+  function formatTime(seconds: number): string {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  }
+
   async function handleOpenProjectFolder(path?: string) {
     const target = path || projectDir();
     if (target) {
@@ -43,6 +51,9 @@ export const ProjectManagerModal: Component<ProjectManagerModalProps> = (props) 
   function handleResumeDraft(draft: SavedProjectDraft) {
     if (draft.filePath && draft.filePath.endsWith(".json")) {
       projectSignals.openProject(draft.filePath);
+    }
+    if (draft.resumeTime && draft.resumeTime > 0) {
+      timelineSignals.setCurrentTime(draft.resumeTime);
     }
     projectSignals.setWorkspaceTab("edit");
     props.onClose();
@@ -94,6 +105,20 @@ export const ProjectManagerModal: Component<ProjectManagerModalProps> = (props) 
                   </span>
                 </div>
                 <div class="flex items-center gap-1.5">
+                  <Show when={currentProject() || projectSignals.videoMetadata()}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        projectSignals.saveAndCloseProject();
+                        setDraftsList(getSavedDrafts());
+                      }}
+                      class="px-2.5 py-1 rounded bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-800/60 text-[11px] text-emerald-300 hover:text-white flex items-center gap-1 cursor-pointer transition font-mono"
+                      title="Save current progress and close workspace"
+                    >
+                      <Save size={11} />
+                      <span>Save & Close</span>
+                    </button>
+                  </Show>
                   <button
                     type="button"
                     onClick={() => handleOpenProjectFolder()}
@@ -185,13 +210,26 @@ export const ProjectManagerModal: Component<ProjectManagerModalProps> = (props) 
                     {(draft) => (
                       <div class="p-3 rounded-xl border border-zinc-800/80 bg-zinc-900/50 hover:bg-zinc-900/80 transition flex items-center justify-between gap-3">
                         <div class="min-w-0 flex-1 space-y-1">
-                          <div class="flex items-center gap-2">
+                          <div class="flex items-center gap-2 flex-wrap">
                             <span class="font-bold text-zinc-100 truncate text-xs">
                               {draft.name}
                             </span>
-                            <span class="px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-400 font-mono text-[9px]">
-                              {draft.clipsCount} clips
+                            <span class="px-1.5 py-0.2 rounded bg-blue-950/60 border border-blue-800/50 text-blue-300 font-mono text-[9px] uppercase font-semibold">
+                              {draft.workflowMode || "hybrid"}
                             </span>
+                            <span class="px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-400 font-mono text-[9px]">
+                              {draft.clipsCount} parts
+                            </span>
+                            <Show when={draft.shortsCount && draft.shortsCount > 0}>
+                              <span class="px-1.5 py-0.2 rounded bg-amber-950/60 border border-amber-800/50 text-amber-300 font-mono text-[9px] font-semibold">
+                                {draft.shortsCount} shorts
+                              </span>
+                            </Show>
+                            <Show when={draft.resumeTime && draft.resumeTime > 0}>
+                              <span class="px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-400 font-mono text-[9px]">
+                                Paused at {formatTime(draft.resumeTime || 0)}
+                              </span>
+                            </Show>
                           </div>
                           <div class="text-[10px] font-mono text-zinc-500 truncate">
                             {draft.filePath}

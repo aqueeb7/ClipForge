@@ -3,16 +3,35 @@ import { projectSignals } from "../stores/project";
 import { timelineSignals } from "../stores/timeline";
 import { chatReplaySignals } from "../stores/chatReplay";
 import { intelligenceSignals } from "../stores/intelligence";
-import { Film, Scissors, Trash2, RefreshCw, Plus, Split, Sliders, MessageSquare, Flame, Sparkles } from "./Icons";
+import {
+  Film,
+  Scissors,
+  Trash2,
+  RefreshCw,
+  Plus,
+  Split,
+  Sliders,
+  MessageSquare,
+  Flame,
+  Sparkles,
+  Type,
+  Layers,
+  ChevronDown,
+} from "./Icons";
 
 export const TimelineScrubber: Component = () => {
   let timelineTrackRef: HTMLDivElement | undefined;
   let scrollContainerRef: HTMLDivElement | undefined;
 
   const [isDragging, setIsDragging] = createSignal(false);
+  const [selectedShortId, setSelectedShortId] = createSignal<string | null>(null);
+  const [showWorkflowMenu, setShowWorkflowMenu] = createSignal(false);
 
   const totalDuration = createMemo(() => projectSignals.videoMetadata()?.durationSeconds || 60);
   const clips = createMemo(() => projectSignals.currentManifest()?.clips ?? []);
+  const shorts = createMemo(() => projectSignals.shortClips());
+  const composition = createMemo(() => projectSignals.currentProject()?.composition);
+  const workflowMode = projectSignals.workflowMode;
   const hasAudioTrack = createMemo(() => Boolean(projectSignals.audioMetadata()));
   const audioOffset = createMemo(() => projectSignals.currentProject()?.synchronization.audioOffsetMs || 0);
 
@@ -86,6 +105,24 @@ export const TimelineScrubber: Component = () => {
     timelineSignals.setCurrentTime(start);
   }
 
+  function handleCreateQuickShort() {
+    const inp = timelineSignals.inPoint();
+    const outp = timelineSignals.outPoint();
+    const curr = timelineSignals.currentTime();
+
+    const start = inp !== null ? inp : Math.max(0, curr - 5);
+    const end = outp !== null && outp > start ? outp : Math.min(totalDuration(), start + 30);
+    const dur = Math.round(end - start);
+    const title = `Short #${shorts().length + 1} (${dur}s)`;
+
+    projectSignals.addShortClip(start, end, {
+      title,
+      framingTemplate: composition()?.stacking?.template || "blur_fill",
+      stacking: composition()?.stacking,
+    });
+    timelineSignals.clearMarkers();
+  }
+
   createEffect(() => {
     const time = timelineSignals.currentTime();
     const zoom = timelineSignals.zoomLevel();
@@ -126,12 +163,87 @@ export const TimelineScrubber: Component = () => {
     return Math.min(100, Math.max(0, (outp / dur) * 100));
   });
 
+  const hasChat = createMemo(() => chatReplaySignals.hasChat());
+  const hasIntelligence = createMemo(() => intelligenceSignals.hasMoments());
+
+  // Dynamic layout offsets for stacked lanes:
+  // Ruler: 0 to 18px
+  // V1 Video / Parts: 18 to 46px (height 28)
+  // S1 Shorts / Highlights: 46 to 74px (height 28)
+  // T1 Titles & Brand: 74 to 96px (height 22)
+  // F1 Framing & Stacking: 96 to 118px (height 22)
+  // C1 Chat (if present): 118 to 142px (height 24)
+  // A1 Audio: bottom track (height 20)
+  const totalTrackHeight = createMemo(() => {
+    let h = 18 + 28 + 28 + 22 + 22 + 20; // 138px base
+    if (hasChat()) h += 24;
+    if (hasIntelligence()) h += 20;
+    return `${h}px`;
+  });
+
   return (
-    <div class="p-3 rounded-xl border border-zinc-800/80 bg-zinc-950 flex flex-col gap-2.5 select-none shrink-0">
-      {/* Top Bar: Timeline Stage & Trimming Toolbar */}
+    <div class="p-3 rounded-xl border border-zinc-800/80 bg-zinc-950 flex flex-col gap-2.5 select-none shrink-0 shadow-lg">
+      {/* Top Bar: Timeline Stage, Workflow Mode & Trimming Toolbar */}
       <div class="flex items-center justify-between text-xs gap-2 flex-wrap border-b border-zinc-800/80 pb-2">
-        {/* Left: Stage Selector (Master Stream vs Parts) */}
+        {/* Left: Workflow Mode Badge + Stage Selector (Master Stream vs Parts) */}
         <div class="flex items-center gap-2">
+          {/* Workflow Mode Pill Selector */}
+          <div class="relative">
+            <button
+              type="button"
+              onClick={() => setShowWorkflowMenu(!showWorkflowMenu())}
+              class="px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-300 hover:text-white font-mono text-[10px] font-semibold flex items-center gap-1 cursor-pointer transition"
+              title="Click to toggle Project Workflow Mode"
+            >
+              <span>Mode: {workflowMode().toUpperCase()}</span>
+              <ChevronDown size={10} />
+            </button>
+
+            <Show when={showWorkflowMenu()}>
+              <div class="absolute left-0 top-full mt-1 w-48 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl py-1 z-50 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    projectSignals.setWorkflowMode("hybrid");
+                    setShowWorkflowMenu(false);
+                  }}
+                  class={`w-full px-3 py-1.5 text-left flex flex-col hover:bg-zinc-800 ${
+                    workflowMode() === "hybrid" ? "text-blue-400 font-bold" : "text-zinc-300"
+                  }`}
+                >
+                  <span>Hybrid Workstation</span>
+                  <span class="text-[9px] text-zinc-500">Both sequential parts & 9:16 shorts</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    projectSignals.setWorkflowMode("episodic");
+                    setShowWorkflowMenu(false);
+                  }}
+                  class={`w-full px-3 py-1.5 text-left flex flex-col hover:bg-zinc-800 ${
+                    workflowMode() === "episodic" ? "text-blue-400 font-bold" : "text-zinc-300"
+                  }`}
+                >
+                  <span>Episodic Stream Slicing</span>
+                  <span class="text-[9px] text-zinc-500">Sequential Part 1, 2, 3 chapters</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    projectSignals.setWorkflowMode("shorts");
+                    setShowWorkflowMenu(false);
+                  }}
+                  class={`w-full px-3 py-1.5 text-left flex flex-col hover:bg-zinc-800 ${
+                    workflowMode() === "shorts" ? "text-blue-400 font-bold" : "text-zinc-300"
+                  }`}
+                >
+                  <span>Highlight Shorts Studio</span>
+                  <span class="text-[9px] text-zinc-500">Fast 15s–60s viral short clips</span>
+                </button>
+              </div>
+            </Show>
+          </div>
+
           <div class="flex items-center bg-zinc-900 p-0.5 rounded-lg border border-zinc-800">
             <button
               type="button"
@@ -170,7 +282,7 @@ export const TimelineScrubber: Component = () => {
           </span>
         </div>
 
-        {/* Center: Trimming Controls */}
+        {/* Center: Trimming & Split Controls */}
         <div class="flex items-center gap-1.5">
           <Show
             when={projectSignals.isMasterStage()}
@@ -183,7 +295,7 @@ export const TimelineScrubber: Component = () => {
                   title="Split active part clip at playhead (Ctrl+K)"
                 >
                   <Scissors size={11} />
-                  <span>Split</span>
+                  <span>Split Part</span>
                 </button>
 
                 <button
@@ -238,11 +350,22 @@ export const TimelineScrubber: Component = () => {
               <span>Divide into Parts &rarr;</span>
             </button>
           </Show>
+
+          {/* Quick Create Short button on toolbar */}
+          <button
+            type="button"
+            onClick={handleCreateQuickShort}
+            class="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded text-[11px] font-semibold transition cursor-pointer flex items-center gap-1 shadow-sm"
+            title="Create a 30s short on the dedicated S1 track"
+          >
+            <Plus size={11} />
+            <span>+ 30s Short</span>
+          </button>
         </div>
 
-        {/* Right Section: Multi-Modal Intelligence, Chat Replay Status & Zoom Controls */}
+        {/* Right Section: Multi-Modal Intelligence, Chat & Zoom Controls */}
         <div class="flex items-center gap-2">
-          {/* Multi-Modal Highlight Intelligence (Specs 007 - 010) */}
+          {/* Multi-Modal Highlight Intelligence */}
           <Show
             when={intelligenceSignals.isAnalyzing()}
             fallback={
@@ -254,7 +377,7 @@ export const TimelineScrubber: Component = () => {
                       type="button"
                       onClick={() => intelligenceSignals.runIntelligence()}
                       class="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-amber-300 rounded text-[11px] font-medium border border-zinc-800 transition cursor-pointer flex items-center gap-1.5"
-                      title="Run offline multi-modal intelligence (chat velocity, audio energy, visual cuts)"
+                      title="Run offline multi-modal intelligence"
                     >
                       <Sparkles size={11} class="text-amber-400" />
                       <span>AI Highlights</span>
@@ -270,7 +393,7 @@ export const TimelineScrubber: Component = () => {
                       ? "bg-amber-500 text-black font-semibold shadow-amber-500/20"
                       : "bg-amber-950/60 border border-amber-700/60 text-amber-300 hover:text-white"
                   }`}
-                  title="Toggle Ranked Highlight Candidates Drawer (Specs 011 & 012)"
+                  title="Toggle Ranked Highlight Candidates Drawer"
                 >
                   <Sparkles size={11} class={intelligenceSignals.isCandidatesDrawerOpen() ? "text-black" : "text-amber-400"} />
                   <span>{intelligenceSignals.totalCandidates() || intelligenceSignals.totalMoments()} Highlights</span>
@@ -280,38 +403,12 @@ export const TimelineScrubber: Component = () => {
           >
             <div class="px-2.5 py-1 rounded text-[11px] font-medium bg-zinc-900 border border-zinc-800 text-amber-300 flex items-center gap-1.5">
               <RefreshCw size={11} class="animate-spin text-amber-400" />
-              <span>
-                {intelligenceSignals.analysisProgress()?.stage === "audio"
-                  ? "Analyzing Audio..."
-                  : intelligenceSignals.analysisProgress()?.stage === "video"
-                  ? "Detecting Scenes..."
-                  : intelligenceSignals.analysisProgress()?.stage === "chat"
-                  ? "Analyzing Chat..."
-                  : "Correlating Highlights..."}
-                {" "}
-                {intelligenceSignals.analysisProgress()?.percent ?? 0}%
-              </span>
+              <span>Analyzing... {intelligenceSignals.analysisProgress()?.percent ?? 0}%</span>
             </div>
           </Show>
 
           {/* Synchronized Chat Intelligence Button */}
-          <Show
-            when={chatReplaySignals.hasChat()}
-            fallback={
-              <Show when={projectSignals.streamProjectDir()}>
-                <button
-                  type="button"
-                  onClick={() => chatReplaySignals.loadProjectChat(projectSignals.streamProjectDir()!)}
-                  disabled={chatReplaySignals.isLoading()}
-                  class="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded text-[11px] font-medium border border-zinc-800 transition cursor-pointer flex items-center gap-1.5"
-                  title="Normalize canonical timeline & load chat replay"
-                >
-                  <RefreshCw size={11} class={chatReplaySignals.isLoading() ? "animate-spin text-blue-400" : "text-zinc-400"} />
-                  <span>Sync Chat</span>
-                </button>
-              </Show>
-            }
-          >
+          <Show when={chatReplaySignals.hasChat()}>
             <button
               type="button"
               onClick={() => chatReplaySignals.toggleDrawer()}
@@ -325,12 +422,6 @@ export const TimelineScrubber: Component = () => {
               <MessageSquare size={12} class={chatReplaySignals.isDrawerOpen() ? "text-emerald-400" : "text-zinc-400"} />
               <span>Chat Replay</span>
               <span class="font-mono text-[10px] opacity-80">({chatReplaySignals.totalMessages().toLocaleString()})</span>
-              <Show when={chatReplaySignals.peakVelocity() > 0}>
-                <span class="flex items-center gap-0.5 text-[10px] text-amber-400 font-mono ml-0.5">
-                  <Flame size={10} />
-                  <span>{chatReplaySignals.peakVelocity().toFixed(1)}/s</span>
-                </span>
-              </Show>
             </button>
           </Show>
 
@@ -389,141 +480,66 @@ export const TimelineScrubber: Component = () => {
           style={{
             width: `${timelineSignals.zoomLevel() * 100}%`,
             "min-width": "100%",
-            height: intelligenceSignals.hasMoments() && chatReplaySignals.hasChat()
-              ? "118px"
-              : intelligenceSignals.hasMoments() || chatReplaySignals.hasChat()
-              ? "96px"
-              : "76px",
+            height: totalTrackHeight(),
           }}
           onMouseDown={startDrag}
         >
-          {/* Time Ruler */}
-          <div class="absolute inset-x-0 top-0 h-4 bg-zinc-900/90 border-b border-zinc-800/80 flex justify-between px-2 text-[9px] font-mono text-zinc-500 pointer-events-none z-10">
+          {/* ===================== ROW 0: TIME RULER ===================== */}
+          <div class="absolute inset-x-0 top-0 h-[18px] bg-zinc-900/90 border-b border-zinc-800/80 flex justify-between px-2 text-[9px] font-mono text-zinc-500 pointer-events-none z-10">
             <span>0:00</span>
-            <span>{formatTime(totalDuration() * 0.25)}</span>
-            <span>{formatTime(totalDuration() * 0.5)}</span>
-            <span>{formatTime(totalDuration() * 0.75)}</span>
+            <span>{formatTime(totalDuration() * 0.2)}</span>
+            <span>{formatTime(totalDuration() * 0.4)}</span>
+            <span>{formatTime(totalDuration() * 0.6)}</span>
+            <span>{formatTime(totalDuration() * 0.8)}</span>
             <span>{formatTime(totalDuration())}</span>
           </div>
 
-          {/* Track: Multi-Modal Highlight Moments (Spec 010) */}
-          <Show when={intelligenceSignals.hasMoments()}>
-            <div
-              class="absolute inset-x-0 h-[20px] bg-amber-950/20 border-b border-amber-900/30 overflow-hidden pointer-events-none z-12"
-              style={{ top: "16px" }}
-            >
-              <div class="absolute left-2 top-0.5 text-[8px] font-mono text-amber-400/80 uppercase tracking-wider flex items-center gap-1">
-                <Sparkles size={9} class="text-amber-400" />
-                <span>H1 Highlights ({intelligenceSignals.totalMoments()})</span>
-              </div>
-            </div>
-
-            {/* Highlight Pins & Clip Intervals */}
-            <For each={intelligenceSignals.momentsChronological()}>
-              {(moment) => {
-                const isSelected = () => intelligenceSignals.selectedMomentId() === moment.id;
-                const leftPct = () => (moment.timestamp / totalDuration()) * 100;
-                const leadInPct = () => (moment.lead_in / totalDuration()) * 100;
-                const widthPct = () => Math.max(0.5, ((moment.lead_out - moment.lead_in) / totalDuration()) * 100);
-
-                return (
-                  <>
-                    {/* Interval Range Ribbon */}
-                    <div
-                      class={`absolute h-[18px] pointer-events-none rounded transition-opacity z-15 ${
-                        isSelected()
-                          ? "bg-amber-400/25 border-l-2 border-r-2 border-amber-400"
-                          : "bg-amber-500/10 hover:bg-amber-500/20"
-                      }`}
-                      style={{
-                        top: "17px",
-                        left: `${leadInPct()}%`,
-                        width: `${widthPct()}%`,
-                      }}
-                    />
-
-                    {/* Diamond Anchor Marker */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        intelligenceSignals.selectMoment(moment);
-                      }}
-                      class={`absolute w-3 h-3 -ml-1.5 top-[19px] rotate-45 transition-transform hover:scale-125 cursor-pointer z-25 ${
-                        isSelected()
-                          ? "bg-amber-300 border-2 border-white shadow-lg shadow-amber-400/50 scale-125"
-                          : moment.confidence >= 0.8
-                          ? "bg-amber-400 border border-amber-200 shadow-sm"
-                          : "bg-yellow-500 border border-yellow-300 opacity-80"
-                      }`}
-                      style={{ left: `${leftPct()}%` }}
-                      title={`${moment.headline} • ${(moment.confidence * 100).toFixed(0)}% Conf • ${moment.sentiment}`}
-                    />
-                  </>
-                );
-              }}
-            </For>
-          </Show>
-
-          {/* Hatched Dead Air Trim Zones */}
-          <Show when={isIntroTrimmed() && masterInPercent() > 0}>
-            <div
-              class="absolute top-4 bottom-0 left-0 bg-red-950/30 border-r border-red-500/60 pointer-events-none z-15 flex items-center justify-center overflow-hidden"
-              style={{ width: `${masterInPercent()}%` }}
-            >
-              <span class="text-[9px] font-mono text-red-400 font-semibold px-1 py-0.5 bg-black/80 rounded border border-red-900/40">
-                Trimmed Intro
-              </span>
-            </div>
-          </Show>
-
-          <Show when={isOutroTrimmed() && masterOutPercent() < 100}>
-            <div
-              class="absolute top-4 bottom-0 right-0 bg-red-950/30 border-l border-red-500/60 pointer-events-none z-15 flex items-center justify-center overflow-hidden"
-              style={{ left: `${masterOutPercent()}%`, width: `${100 - masterOutPercent()}%` }}
-            >
-              <span class="text-[9px] font-mono text-red-400 font-semibold px-1 py-0.5 bg-black/80 rounded border border-red-900/40">
-                Trimmed Outro
-              </span>
-            </div>
-          </Show>
-
-          {/* In/Out Selection Range Overlay */}
-          <Show
-            when={
-              inPointPercent() !== null &&
-              outPointPercent() !== null &&
-              outPointPercent()! > inPointPercent()!
-            }
-          >
-            <div
-              class="absolute top-4 bottom-0 bg-blue-500/15 border-l border-r border-blue-400 pointer-events-none z-20"
-              style={{
-                left: `${inPointPercent()}%`,
-                width: `${outPointPercent()! - inPointPercent()!}%`
-              }}
-            />
-          </Show>
-
-          {/* Track 1: Video Lane Content */}
+          {/* ===================== ROW 1: TRACK V1 (VIDEO & PARTS) ===================== */}
           <div
-            class="absolute inset-x-0 flex items-center px-0.5"
-            style={{
-              top: intelligenceSignals.hasMoments() ? "37px" : "16px",
-              height: chatReplaySignals.hasChat() ? "26px" : "28px",
-            }}
+            class="absolute inset-x-0 h-[28px] bg-zinc-950/40 border-b border-zinc-800/80 overflow-hidden"
+            style={{ top: "18px" }}
           >
+            {/* Sticky Track Label */}
+            <div class="sticky left-1 top-1 text-[8px] font-mono uppercase tracking-wider text-blue-400 bg-blue-950/90 px-1 rounded border border-blue-800/60 inline-flex items-center gap-1 z-15 pointer-events-none">
+              <Film size={9} />
+              <span>V1 Video / Parts</span>
+            </div>
+
+            {/* Hatched Dead Air Trim Zones */}
+            <Show when={isIntroTrimmed() && masterInPercent() > 0}>
+              <div
+                class="absolute top-0 bottom-0 left-0 bg-red-950/40 border-r border-red-500/60 pointer-events-none z-10 flex items-center justify-center overflow-hidden"
+                style={{ width: `${masterInPercent()}%` }}
+              >
+                <span class="text-[8px] font-mono text-red-400 font-semibold px-1 py-0.2 bg-black/80 rounded">
+                  Trimmed Intro
+                </span>
+              </div>
+            </Show>
+
+            <Show when={isOutroTrimmed() && masterOutPercent() < 100}>
+              <div
+                class="absolute top-0 bottom-0 right-0 bg-red-950/40 border-l border-red-500/60 pointer-events-none z-10 flex items-center justify-center overflow-hidden"
+                style={{ left: `${masterOutPercent()}%`, width: `${100 - masterOutPercent()}%` }}
+              >
+                <span class="text-[8px] font-mono text-red-400 font-semibold px-1 py-0.2 bg-black/80 rounded">
+                  Trimmed Outro
+                </span>
+              </div>
+            </Show>
+
+            {/* Master Stream / Sequential Part Clips */}
             <Show
               when={projectSignals.isPartsStage()}
               fallback={
                 <div
-                  class="absolute rounded bg-blue-950/60 border border-blue-600/60 h-6 flex items-center justify-between px-2 text-[10px] font-mono text-blue-200 transition-all overflow-hidden"
+                  class="absolute top-1 rounded bg-blue-950/60 border border-blue-600/60 h-6 flex items-center justify-between px-2 text-[10px] font-mono text-blue-200 overflow-hidden"
                   style={{
                     left: `${masterInPercent()}%`,
-                    width: `${Math.max(1, masterOutPercent() - masterInPercent())}%`
+                    width: `${Math.max(1, masterOutPercent() - masterInPercent())}%`,
                   }}
                 >
-                  <span class="font-semibold text-zinc-100">Full Stream Master</span>
+                  <span class="font-semibold text-zinc-100 truncate">Full Stream Master</span>
                   <span class="text-[9px] text-zinc-400">{formatTime(projectSignals.activeStreamDuration())}</span>
                 </div>
               }
@@ -533,9 +549,9 @@ export const TimelineScrubber: Component = () => {
                   const isSelected = () => clip.id === timelineSignals.selectedClipId();
                   return (
                     <div
-                      class={`absolute rounded border transition-all flex items-center justify-between px-2 overflow-hidden text-[10px] font-mono cursor-pointer h-6 ${
+                      class={`absolute top-1 rounded border transition-all flex items-center justify-between px-2 overflow-hidden text-[10px] font-mono cursor-pointer h-6 ${
                         isSelected()
-                          ? "bg-blue-600 border-blue-300 text-white font-semibold shadow-md z-25"
+                          ? "bg-blue-600 border-blue-300 text-white font-semibold shadow-md z-20"
                           : index() % 2 === 0
                           ? "bg-zinc-800 border-zinc-700/80 text-zinc-200 hover:bg-zinc-700/80"
                           : "bg-zinc-850 border-zinc-700/70 text-zinc-300 hover:bg-zinc-700/80"
@@ -545,7 +561,7 @@ export const TimelineScrubber: Component = () => {
                         width: `${Math.max(
                           0.6,
                           ((clip.sourceEndSeconds - clip.sourceStartSeconds) / totalDuration()) * 100
-                        )}%`
+                        )}%`,
                       }}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -564,17 +580,138 @@ export const TimelineScrubber: Component = () => {
             </Show>
           </div>
 
-          {/* Track 2: Chat Density Heatbar / Waveform (Spec 006) */}
-          <Show when={chatReplaySignals.hasChat()}>
-            <div
-              class="absolute inset-x-0 h-[26px] bg-zinc-950/80 border-t border-b border-zinc-800/60 overflow-hidden"
-              style={{ top: intelligenceSignals.hasMoments() ? "64px" : "43px" }}
+          {/* ===================== ROW 2: TRACK S1 (9:16 SHORTS & HIGHLIGHTS) ===================== */}
+          <div
+            class="absolute inset-x-0 h-[28px] bg-amber-950/10 border-b border-zinc-800/80 overflow-hidden"
+            style={{ top: "46px" }}
+          >
+            {/* Sticky Track Label + Quick Action */}
+            <div class="sticky left-1 top-1 text-[8px] font-mono uppercase tracking-wider text-amber-300 bg-amber-950/90 px-1 rounded border border-amber-800/60 inline-flex items-center gap-1 z-15 pointer-events-none">
+              <Scissors size={9} />
+              <span>S1 9:16 Shorts ({shorts().length})</span>
+            </div>
+
+            {/* Shorts Lane Content */}
+            <Show
+              when={shorts().length > 0}
+              fallback={
+                <div class="absolute inset-x-0 top-1.5 flex items-center justify-center text-[9px] font-mono text-zinc-600 border border-dashed border-zinc-800/60 rounded h-5 mx-24 pointer-events-none">
+                  <span>+ Create Short (30s vertical clips will populate this dedicated lane)</span>
+                </div>
+              }
             >
-              <div class="absolute left-2 top-0.5 text-[9px] font-mono text-zinc-500 uppercase tracking-wider pointer-events-none z-10 flex items-center gap-1">
-                <span>C1 Chat Replay Heatmap</span>
-                <Show when={chatReplaySignals.peakVelocity() > 0}>
-                  <span class="text-amber-400 font-semibold">• Peak {chatReplaySignals.peakVelocity().toFixed(1)}/s</span>
-                </Show>
+              <For each={shorts()}>
+                {(short) => {
+                  const isSelected = () => short.id === selectedShortId();
+                  const leftPct = () => (short.start / totalDuration()) * 100;
+                  const widthPct = () => Math.max(0.8, ((short.end - short.start) / totalDuration()) * 100);
+
+                  return (
+                    <div
+                      class={`absolute top-1 rounded border flex items-center justify-between px-2 overflow-hidden text-[10px] font-mono cursor-pointer h-6 transition-all z-20 ${
+                        isSelected()
+                          ? "bg-amber-500 text-black border-white font-bold shadow-lg shadow-amber-500/40"
+                          : "bg-amber-950/80 border-amber-600/70 text-amber-200 hover:bg-amber-900/80"
+                      }`}
+                      style={{
+                        left: `${leftPct()}%`,
+                        width: `${widthPct()}%`,
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        timelineSignals.setCurrentTime(short.start);
+                        setSelectedShortId(short.id);
+                        timelineSignals.setViewMode("vertical");
+                      }}
+                      title={`${short.title}: ${formatTime(short.start)} - ${formatTime(short.end)} • Template: ${short.framingTemplate}`}
+                    >
+                      <div class="flex items-center gap-1 truncate">
+                        <span class="truncate">✂️ {short.title}</span>
+                      </div>
+                      <div class="flex items-center gap-1 shrink-0 ml-1">
+                        <span class="text-[9px] px-1 rounded bg-black/40 text-amber-300 font-mono">
+                          {short.duration.toFixed(0)}s
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            projectSignals.removeShortClip(short.id);
+                          }}
+                          class="hover:text-red-400 p-0.5"
+                          title="Remove short"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }}
+              </For>
+            </Show>
+          </div>
+
+          {/* ===================== ROW 3: TRACK T1 (TITLES & TEXT OVERLAYS) ===================== */}
+          <div
+            class="absolute inset-x-0 h-[22px] bg-sky-950/15 border-b border-zinc-800/80 overflow-hidden"
+            style={{ top: "74px" }}
+          >
+            <div class="sticky left-1 top-0.5 text-[8px] font-mono uppercase tracking-wider text-sky-400 bg-sky-950/90 px-1 rounded border border-sky-800/60 inline-flex items-center gap-1 z-15 pointer-events-none">
+              <Type size={9} />
+              <span>T1 Titles</span>
+            </div>
+
+            <Show when={composition()?.overlay?.enabled}>
+              <div
+                class="absolute top-1 h-4 rounded bg-sky-950/80 border border-sky-700/60 flex items-center px-2 text-[9px] font-mono text-sky-200 truncate pointer-events-none"
+                style={{
+                  left: `${masterInPercent()}%`,
+                  width: `${Math.max(2, masterOutPercent() - masterInPercent())}%`,
+                }}
+              >
+                <span class="truncate">🏷️ {composition()?.overlay?.brandTitle || "CLIPFORGE"} • {composition()?.overlay?.episodeLabel || "PART"} #Shorts</span>
+              </div>
+            </Show>
+          </div>
+
+          {/* ===================== ROW 4: TRACK F1 (FRAMING & STACKING STYLE) ===================== */}
+          <div
+            class="absolute inset-x-0 h-[22px] bg-purple-950/15 border-b border-zinc-800/80 overflow-hidden"
+            style={{ top: "96px" }}
+          >
+            <div class="sticky left-1 top-0.5 text-[8px] font-mono uppercase tracking-wider text-purple-400 bg-purple-950/90 px-1 rounded border border-purple-800/60 inline-flex items-center gap-1 z-15 pointer-events-none">
+              <Layers size={9} />
+              <span>F1 Framing</span>
+            </div>
+
+            <div
+              class="absolute top-1 h-4 rounded bg-purple-950/80 border border-purple-700/60 flex items-center px-2 text-[9px] font-mono text-purple-200 truncate pointer-events-none"
+              style={{
+                left: `${masterInPercent()}%`,
+                width: `${Math.max(2, masterOutPercent() - masterInPercent())}%`,
+              }}
+            >
+              <span class="truncate">
+                📐 {composition()?.stacking?.template === "stacked_split"
+                  ? `Stacked Split (Cam ${composition()?.stacking?.topHeightPercent || 35}% + Game ${100 - (composition()?.stacking?.topHeightPercent || 35)}%)`
+                  : composition()?.stacking?.template === "split_50_50"
+                  ? "50/50 Dual Zone Split"
+                  : composition()?.stacking?.template === "pan_scan"
+                  ? `Pan & Scan 9:16 Crop (${((composition()?.stacking?.cropRegion?.x ?? 21.875) + 28.125).toFixed(0)}%)`
+                  : "Blur Fill (9:16 Letterbox)"}
+              </span>
+            </div>
+          </div>
+
+          {/* ===================== ROW 5: TRACK C1 (LIVE CHAT HEATMAP) ===================== */}
+          <Show when={hasChat()}>
+            <div
+              class="absolute inset-x-0 h-[24px] bg-zinc-950/80 border-b border-zinc-800/80 overflow-hidden"
+              style={{ top: "118px" }}
+            >
+              <div class="sticky left-1 top-0.5 text-[8px] font-mono uppercase tracking-wider text-emerald-400 bg-emerald-950/90 px-1 rounded border border-emerald-800/60 inline-flex items-center gap-1 z-15 pointer-events-none">
+                <MessageSquare size={9} />
+                <span>C1 Chat Spikes</span>
               </div>
 
               {/* Bucket Bars */}
@@ -583,7 +720,7 @@ export const TimelineScrubber: Component = () => {
                   {(b) => {
                     const peak = () => chatReplaySignals.peakVelocity() || 1;
                     const ratio = () => Math.min(1, b.velocity / peak());
-                    const heightPx = () => Math.max(2, Math.round(ratio() * 20));
+                    const heightPx = () => Math.max(2, Math.round(ratio() * 18));
                     const isHigh = () => ratio() >= 0.65;
                     const isMed = () => ratio() >= 0.35 && ratio() < 0.65;
 
@@ -616,27 +753,44 @@ export const TimelineScrubber: Component = () => {
             </div>
           </Show>
 
-          {/* Track 3: Audio Lane */}
+          {/* ===================== ROW 6: TRACK A1 (AUDIO LANE) ===================== */}
           <div
-            class="absolute inset-x-0 bottom-0 bg-zinc-900/60 border-t border-zinc-800/80 flex items-center justify-between px-2 text-[9px] font-mono text-zinc-500 pointer-events-none"
-            style={{
-              height: chatReplaySignals.hasChat() ? "24px" : "18px",
-            }}
+            class="absolute inset-x-0 bottom-0 bg-zinc-900/60 border-t border-zinc-800/80 flex items-center justify-between px-2 text-[9px] font-mono text-zinc-500 pointer-events-none h-[20px]"
           >
-            <span class="text-zinc-400">A1 Audio Track</span>
-            <Show when={hasAudioTrack()}>
-              <span class="text-emerald-400">
-                Dedicated Stream ({audioOffset() >= 0 ? "+" : ""}{audioOffset()}ms)
-              </span>
-            </Show>
+            <span class="text-zinc-400 flex items-center gap-1">
+              <span>[A1] Audio Track</span>
+              <Show when={hasAudioTrack()}>
+                <span class="text-emerald-400">
+                  • Dedicated Stream ({audioOffset() >= 0 ? "+" : ""}{audioOffset()}ms)
+                </span>
+              </Show>
+            </span>
+            <span class="text-zinc-500">{formatTime(totalDuration())}</span>
           </div>
 
-          {/* Playhead Line */}
+          {/* In/Out Selection Range Overlay */}
+          <Show
+            when={
+              inPointPercent() !== null &&
+              outPointPercent() !== null &&
+              outPointPercent()! > inPointPercent()!
+            }
+          >
+            <div
+              class="absolute top-4 bottom-0 bg-blue-500/15 border-l-2 border-r-2 border-blue-400 pointer-events-none z-25"
+              style={{
+                left: `${inPointPercent()}%`,
+                width: `${outPointPercent()! - inPointPercent()!}%`,
+              }}
+            />
+          </Show>
+
+          {/* Red Playhead Line Sweeping Across All Tracks */}
           <div
-            class="absolute top-0 bottom-0 w-[2px] bg-red-500 pointer-events-none z-30 shadow"
+            class="absolute top-0 bottom-0 w-[2px] bg-red-500 pointer-events-none z-30 shadow-md"
             style={{ left: `${playheadPositionPercent()}%` }}
           >
-            <div class="w-2.5 h-2.5 bg-red-500 rounded-full -ml-[4px] -mt-[1px] border border-white" />
+            <div class="w-3 h-3 bg-red-500 rounded-full -ml-[5px] -mt-[2px] border-2 border-white shadow-sm" />
           </div>
         </div>
       </div>

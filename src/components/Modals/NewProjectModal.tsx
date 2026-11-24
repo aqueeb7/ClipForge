@@ -1,6 +1,7 @@
 import { Component, createSignal, createEffect, Show } from "solid-js";
 import { projectSignals } from "../../stores/project";
 import { openDirectoryDialog } from "../../services/api";
+import type { WorkflowMode } from "../../types/index.js";
 import { Plus, X, AlertCircle } from "../Icons";
 
 interface NewProjectModalProps {
@@ -11,12 +12,14 @@ interface NewProjectModalProps {
 export const NewProjectModal: Component<NewProjectModalProps> = (props) => {
   const [projectName, setProjectName] = createSignal("New Project");
   const [outputDir, setOutputDir] = createSignal("");
+  const [workflowMode, setWorkflowMode] = createSignal<WorkflowMode>("hybrid");
   const [overwriteWarning, setOverwriteWarning] = createSignal(false);
 
   createEffect(() => {
     if (props.open) {
       setProjectName("New Project " + new Date().toISOString().slice(0, 10));
       setOutputDir(projectSignals.currentProject()?.export.outputDirectory || "");
+      setWorkflowMode("hybrid");
       setOverwriteWarning(projectSignals.isDirty() || Boolean(projectSignals.videoMetadata()));
     }
   });
@@ -31,7 +34,8 @@ export const NewProjectModal: Component<NewProjectModalProps> = (props) => {
   function handleCreate() {
     projectSignals.createNewProject({
       name: projectName().trim() || "Untitled Project",
-      outputDirectory: outputDir() || undefined
+      outputDirectory: outputDir() || undefined,
+      workflowMode: workflowMode()
     });
     props.onClose();
   }
@@ -95,6 +99,58 @@ export const NewProjectModal: Component<NewProjectModalProps> = (props) => {
                   if (e.key === "Enter") handleCreate();
                 }}
               />
+            </div>
+
+            <div>
+              <label class="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
+                Workflow Mode
+              </label>
+              <div class="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setWorkflowMode("hybrid")}
+                  class={`p-2.5 rounded-lg border text-left cursor-pointer transition flex flex-col justify-between ${
+                    workflowMode() === "hybrid"
+                      ? "border-blue-500 bg-blue-950/40 text-blue-200"
+                      : "border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900 text-zinc-400"
+                  }`}
+                >
+                  <span class="text-xs font-bold text-zinc-200 block">Hybrid</span>
+                  <span class="text-[9px] text-zinc-400 mt-1 leading-tight">
+                    Episodic parts + vertical shorts in parallel.
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setWorkflowMode("episodic")}
+                  class={`p-2.5 rounded-lg border text-left cursor-pointer transition flex flex-col justify-between ${
+                    workflowMode() === "episodic"
+                      ? "border-emerald-500 bg-emerald-950/40 text-emerald-200"
+                      : "border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900 text-zinc-400"
+                  }`}
+                >
+                  <span class="text-xs font-bold text-zinc-200 block">Episodic</span>
+                  <span class="text-[9px] text-zinc-400 mt-1 leading-tight">
+                    Split master stream into sequential chapters.
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setWorkflowMode("shorts")}
+                  class={`p-2.5 rounded-lg border text-left cursor-pointer transition flex flex-col justify-between ${
+                    workflowMode() === "shorts"
+                      ? "border-amber-500 bg-amber-950/40 text-amber-200"
+                      : "border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900 text-zinc-400"
+                  }`}
+                >
+                  <span class="text-xs font-bold text-zinc-200 block">Shorts</span>
+                  <span class="text-[9px] text-zinc-400 mt-1 leading-tight">
+                    Focus on viral 9:16 clips & split framing.
+                  </span>
+                </button>
+              </div>
             </div>
 
             <div>
