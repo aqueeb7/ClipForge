@@ -173,7 +173,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
           >
             <Scissors size={12} class="text-blue-400" />
             <span>Stream Parts</span>
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-mono tabular-nums bg-zinc-900 border border-zinc-800 text-zinc-300">
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-mono tabular-nums bg-zinc-900 border border-zinc-800 text-zinc-300">
               {clips().length}
             </span>
           </button>
@@ -189,7 +189,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
           >
             <Film size={12} class="text-amber-400" />
             <span>9:16 Shorts</span>
-            <span class="px-1.5 py-0.2 rounded text-[10px] font-mono tabular-nums bg-amber-950 border border-amber-800/50 text-amber-300">
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-mono tabular-nums bg-amber-950 border border-amber-800/50 text-amber-300">
               {shortClips().length}
             </span>
           </button>
@@ -429,7 +429,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
 
                       {/* Row 2: Template Tag + Filename */}
                       <div class="flex items-center gap-2 pl-8 text-[10px] min-w-0">
-                        <span class="font-mono uppercase px-1.5 py-0.2 rounded bg-amber-950/50 border border-amber-800/40 text-amber-300 shrink-0 whitespace-nowrap">
+                        <span class="font-mono uppercase px-1.5 py-0.5 rounded bg-amber-950/50 border border-amber-800/40 text-amber-300 shrink-0 whitespace-nowrap">
                           {templateLabel()}
                         </span>
                         <span class="font-mono text-zinc-500 truncate" title={clip().outputName}>
@@ -618,7 +618,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                             <div class="flex items-center gap-1 flex-wrap">
                               <Show when={hasYT}>
                                 <span
-                                  class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-red-950/60 text-red-300 border border-red-800/50 text-[9px] font-medium shrink-0 whitespace-nowrap"
+                                  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-950/60 text-red-300 border border-red-800/50 text-[9px] font-medium shrink-0 whitespace-nowrap"
                                   title="Uploaded to YouTube Shorts"
                                 >
                                   <YouTubeIcon size={9} class="text-red-500" />
@@ -640,14 +640,14 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                               </Show>
 
                               <Show when={hasInsta}>
-                                <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-pink-950/60 text-pink-300 border border-pink-800/50 text-[9px] font-medium shrink-0 whitespace-nowrap">
+                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-pink-950/60 text-pink-300 border border-pink-800/50 text-[9px] font-medium shrink-0 whitespace-nowrap">
                                   <InstagramIcon size={9} class="text-pink-400" />
                                   <span>Reels</span>
                                 </span>
                               </Show>
 
                               <Show when={hasTT}>
-                                <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-800/50 text-[9px] font-medium shrink-0 whitespace-nowrap">
+                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-800/50 text-[9px] font-medium shrink-0 whitespace-nowrap">
                                   <TikTokIcon size={9} class="text-cyan-400" />
                                   <span>TikTok</span>
                                 </span>
