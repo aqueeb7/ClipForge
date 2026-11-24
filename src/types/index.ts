@@ -184,6 +184,38 @@ export interface GpuEncoderInfo {
   description: string;
 }
 
+export interface PhysicalGpuDevice {
+  name: string;
+  vendor: "NVIDIA" | "Intel" | "AMD" | "Apple" | "Other" | string;
+  memory_mb: number;
+  is_discrete: boolean;
+  driver_version?: string;
+  cuda_supported: boolean;
+  cuda_version?: string;
+}
+
+export interface EngineOption {
+  id: string;
+  name: string;
+  category: "decoder" | "encoder" | "inference" | string;
+  device_name: string;
+  is_hardware: boolean;
+  is_available: boolean;
+  is_recommended: boolean;
+  description: string;
+}
+
+export interface TriEngineHardwareProfile {
+  devices: PhysicalGpuDevice[];
+  active_decoder: EngineOption;
+  available_decoders: EngineOption[];
+  active_encoder: EngineOption;
+  available_encoders: EngineOption[];
+  active_inference: EngineOption;
+  available_inference: EngineOption[];
+  summary: string;
+}
+
 export interface AppDiagnostic {
   ready: bool_or_boolean;
   os: string;

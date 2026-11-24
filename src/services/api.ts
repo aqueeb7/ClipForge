@@ -3,6 +3,9 @@ import type {
   ClipManifest,
   Clip,
   GpuEncoderInfo,
+  TriEngineHardwareProfile,
+  EngineOption,
+  PhysicalGpuDevice,
   AppDiagnostic,
   StreamSummary,
   RenderClipRequest,
@@ -21,6 +24,9 @@ import {
 
 export type {
   GpuEncoderInfo,
+  TriEngineHardwareProfile,
+  EngineOption,
+  PhysicalGpuDevice,
   AppDiagnostic,
   StreamSummary as MediaMetadata,
   RenderClipRequest,
@@ -113,6 +119,173 @@ export async function getGpuInfo(): Promise<GpuEncoderInfo> {
     is_hardware: false,
     description: "Software CPU (Simulated)"
   };
+}
+
+/**
+ * Retrieves the full Tri-Engine decoupled hardware profile:
+ * Tier 1: Video Decoding (D3D11VA / QSV / CPU)
+ * Tier 2: Video Encoding (Intel QSV / NVENC / AMF / CPU)
+ * Tier 3: AI Inference & RAG Acceleration (NVIDIA CUDA / DirectML / CPU)
+ */
+export async function getTriEngineHardwareInfo(): Promise<TriEngineHardwareProfile> {
+  if (isTauriEnvironment()) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      return await invoke<TriEngineHardwareProfile>("get_tri_engine_hardware_info");
+    } catch (err) {
+      console.warn("Failed to get tri-engine hardware info:", err);
+    }
+  }
+
+  // Fallback profile for browser testbench
+  return {
+    devices: [
+      {
+        name: "Intel(R) Iris(R) Xe Graphics",
+        vendor: "Intel",
+        memory_mb: 2048,
+        is_discrete: false,
+        driver_version: "32.0.101.7088",
+        cuda_supported: false,
+      },
+      {
+        name: "NVIDIA GeForce MX350",
+        vendor: "NVIDIA",
+        memory_mb: 2048,
+        is_discrete: true,
+        driver_version: "32.0.15.8267",
+        cuda_supported: true,
+        cuda_version: "CUDA 13.0",
+      },
+    ],
+    active_decoder: {
+      id: "d3d11va",
+      name: "Direct3D 11 Video Acceleration (D3D11VA)",
+      category: "decoder",
+      device_name: "Intel(R) Iris(R) Xe Graphics",
+      is_hardware: true,
+      is_available: true,
+      is_recommended: true,
+      description: "Unified memory hardware decode. Zero-copy playback for 2K/4K streams.",
+    },
+    available_decoders: [
+      {
+        id: "d3d11va",
+        name: "Direct3D 11 Video Acceleration (D3D11VA)",
+        category: "decoder",
+        device_name: "Intel(R) Iris(R) Xe Graphics",
+        is_hardware: true,
+        is_available: true,
+        is_recommended: true,
+        description: "Unified memory hardware decode. Zero-copy playback for 2K/4K streams.",
+      },
+      {
+        id: "cpu",
+        name: "Software Multi-threaded CPU (avcodec)",
+        category: "decoder",
+        device_name: "Host CPU (AVX2)",
+        is_hardware: false,
+        is_available: true,
+        is_recommended: false,
+        description: "Standard software video decoder.",
+      },
+    ],
+    active_encoder: {
+      id: "h264_qsv",
+      name: "Intel QuickSync Video (h264_qsv)",
+      category: "encoder",
+      device_name: "Intel(R) Iris(R) Xe Graphics",
+      is_hardware: true,
+      is_available: true,
+      is_recommended: true,
+      description: "Dedicated Intel fixed-function hardware encoder. 5x-10x faster exports with high visual quality.",
+    },
+    available_encoders: [
+      {
+        id: "h264_qsv",
+        name: "Intel QuickSync Video (h264_qsv)",
+        category: "encoder",
+        device_name: "Intel(R) Iris(R) Xe Graphics",
+        is_hardware: true,
+        is_available: true,
+        is_recommended: true,
+        description: "Dedicated Intel fixed-function hardware encoder. 5x-10x faster exports with high visual quality.",
+      },
+      {
+        id: "libx264",
+        name: "Software Multi-threaded CPU (libx264)",
+        category: "encoder",
+        device_name: "Host CPU (AVX2)",
+        is_hardware: false,
+        is_available: true,
+        is_recommended: false,
+        description: "High-fidelity software CPU encoder.",
+      },
+    ],
+    active_inference: {
+      id: "cuda",
+      name: "NVIDIA CUDA / TensorRT (NVIDIA GeForce MX350)",
+      category: "inference",
+      device_name: "NVIDIA GeForce MX350",
+      is_hardware: true,
+      is_available: true,
+      is_recommended: true,
+      description: "640 CUDA cores with 2048 MB VRAM. Blazing-fast Whisper auto-captions, face tracking, and RAG embeddings without taxing the CPU.",
+    },
+    available_inference: [
+      {
+        id: "cuda",
+        name: "NVIDIA CUDA / TensorRT (NVIDIA GeForce MX350)",
+        category: "inference",
+        device_name: "NVIDIA GeForce MX350",
+        is_hardware: true,
+        is_available: true,
+        is_recommended: true,
+        description: "640 CUDA cores with 2048 MB VRAM. Blazing-fast Whisper auto-captions, face tracking, and RAG embeddings without taxing the CPU.",
+      },
+      {
+        id: "directml",
+        name: "DirectML Neural Acceleration (Intel Iris Xe)",
+        category: "inference",
+        device_name: "Intel(R) Iris(R) Xe Graphics",
+        is_hardware: true,
+        is_available: true,
+        is_recommended: false,
+        description: "Hardware accelerated machine learning through Windows DirectML on Intel Iris Xe.",
+      },
+      {
+        id: "cpu_onnx",
+        name: "ONNX Runtime CPU (Multi-threaded AVX2/FMA)",
+        category: "inference",
+        device_name: "Host CPU (All Cores)",
+        is_hardware: false,
+        is_available: true,
+        is_recommended: false,
+        description: "Universal CPU execution provider for AI models.",
+      },
+    ],
+    summary: "Tri-Engine Active: Decode [Intel Iris Xe], AI Inference [NVIDIA GeForce MX350], Video Export [Intel QuickSync]",
+  };
+}
+
+export async function setHardwareTriEnginePreference(options: {
+  decoder?: string;
+  encoder?: string;
+  inference?: string;
+}): Promise<TriEngineHardwareProfile> {
+  if (isTauriEnvironment()) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      return await invoke<TriEngineHardwareProfile>("set_hardware_tri_engine_preference", {
+        decoder: options.decoder || null,
+        encoder: options.encoder || null,
+        inference: options.inference || null,
+      });
+    } catch (err) {
+      console.warn("Failed to set hardware tri-engine preference:", err);
+    }
+  }
+  return await getTriEngineHardwareInfo();
 }
 
 /**

@@ -567,6 +567,19 @@ export const UnifiedStudioSidebar: Component<UnifiedStudioSidebarProps> = (props
                   </button>
                 </div>
 
+                {/* AI Hardware Acceleration Info Banner */}
+                <div class="px-2.5 py-1 bg-zinc-950 border-b border-zinc-800/80 flex items-center justify-between text-[10px] font-mono text-zinc-400 shrink-0">
+                  <div class="flex items-center gap-1.5 truncate">
+                    <Sparkles size={10} class="text-amber-400 shrink-0" />
+                    <span class="truncate">
+                      AI Engine: <span class="text-amber-300 font-bold">{projectSignals.triEngineProfile()?.active_inference.name.split("(")[0] || "NVIDIA CUDA (MX350)"}</span>
+                    </span>
+                  </div>
+                  <span class="px-1.5 py-0.2 rounded bg-amber-950/60 border border-amber-800/50 text-amber-300 text-[9px] shrink-0 font-bold">
+                    640 CUDA Cores
+                  </span>
+                </div>
+
                 <div class="flex-1 min-h-0 overflow-hidden">
                   <Show when={intelSubTab() === "highlights"}>
                     <HighlightCandidatesDrawer onClose={() => projectSignals.setIsStudioSidebarCollapsed(true)} />

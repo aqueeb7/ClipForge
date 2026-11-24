@@ -25,8 +25,11 @@ import {
   openFileDialog,
   saveProjectToDisk,
   loadProjectFromDisk,
+  getTriEngineHardwareInfo,
+  setHardwareTriEnginePreference,
   type EnvironmentInfo,
-  type MediaMetadata
+  type MediaMetadata,
+  type TriEngineHardwareProfile
 } from "../services/api.js";
 import {
   saveSessionState,
@@ -47,6 +50,7 @@ const [videoMetadata, setVideoMetadata] = createSignal<MediaMetadata | null>(nul
 const [audioMetadata, setAudioMetadata] = createSignal<MediaMetadata | null>(null);
 const [currentManifest, setCurrentManifest] = createSignal<ClipManifest | null>(null);
 const [environmentStatus, setEnvironmentStatus] = createSignal<EnvironmentInfo | null>(null);
+const [triEngineProfile, setTriEngineProfile] = createSignal<TriEngineHardwareProfile | null>(null);
 const [videoAssetUrl, setVideoAssetUrl] = createSignal<string | null>(null);
 const [audioAssetUrl, setAudioAssetUrl] = createSignal<string | null>(null);
 const [isLoading, setIsLoading] = createSignal<boolean>(false);
@@ -146,10 +150,42 @@ const isAudioAttached = createMemo(() => Boolean(audioMetadata()));
 // Action Functions
 async function checkSystemEnvironment() {
   try {
-    const env = await checkEnvironment();
+    const [env, tri] = await Promise.all([
+      checkEnvironment(),
+      getTriEngineHardwareInfo()
+    ]);
     setEnvironmentStatus(env);
+    setTriEngineProfile(tri);
   } catch (err: unknown) {
     console.error("Environment check error:", err);
+  }
+}
+
+async function updateTriEnginePreference(options: {
+  decoder?: string;
+  encoder?: string;
+  inference?: string;
+}) {
+  try {
+    const updated = await setHardwareTriEnginePreference(options);
+    setTriEngineProfile(updated);
+    if (updated.active_encoder) {
+      setEnvironmentStatus((prev) =>
+        prev
+          ? {
+              ...prev,
+              gpu: {
+                encoder: updated.active_encoder.id,
+                name: updated.active_encoder.name,
+                is_hardware: updated.active_encoder.is_hardware,
+                description: updated.active_encoder.description
+              }
+            }
+          : prev
+      );
+    }
+  } catch (err: unknown) {
+    console.error("Failed to update Tri-Engine preference:", err);
   }
 }
 
@@ -1306,6 +1342,9 @@ export const projectSignals = {
   currentManifest,
   setCurrentManifest,
   environmentStatus,
+  triEngineProfile,
+  setTriEngineProfile,
+  updateTriEnginePreference,
   videoAssetUrl,
   audioAssetUrl,
   isLoading,

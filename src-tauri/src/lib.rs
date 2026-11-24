@@ -23,7 +23,10 @@ use normalizer::{
     normalize_stream_project_internal, ChatIndex, TimelineSummary,
 };
 use ffmpeg::{cleanup_incomplete_files_internal, execute_render_task, inspect_media_internal, resolve_project_path};
-use gpu::{get_gpu_encoder_info, GpuEncoderInfo};
+use gpu::{
+    get_gpu_encoder_info, get_tri_engine_profile, set_hardware_engine_preference as set_pref,
+    GpuEncoderInfo, TriEngineHardwareProfile,
+};
 use menu::setup_native_menu;
 use publish::{
     cancel_oauth_listener_internal, clear_stored_credentials_internal, exchange_oauth_code_internal,
@@ -39,14 +42,28 @@ use tauri::Emitter;
 
 #[tauri::command]
 fn get_gpu_info() -> GpuEncoderInfo {
-    get_gpu_encoder_info().clone()
+    get_gpu_encoder_info()
+}
+
+#[tauri::command]
+fn get_tri_engine_hardware_info() -> TriEngineHardwareProfile {
+    get_tri_engine_profile()
+}
+
+#[tauri::command]
+fn set_hardware_tri_engine_preference(
+    decoder: Option<String>,
+    encoder: Option<String>,
+    inference: Option<String>,
+) -> TriEngineHardwareProfile {
+    set_pref(decoder, encoder, inference)
 }
 
 #[tauri::command]
 fn get_app_info() -> Result<AppDiagnostic, String> {
     let ffmpeg_found = Command::new("ffmpeg").arg("-version").output().is_ok();
     let ffprobe_found = Command::new("ffprobe").arg("-version").output().is_ok();
-    let gpu = Some(get_gpu_encoder_info().clone());
+    let gpu = Some(get_gpu_encoder_info());
     Ok(AppDiagnostic {
         ready: ffmpeg_found,
         os: std::env::consts::OS.to_string(),
@@ -361,6 +378,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_app_info,
             get_gpu_info,
+            get_tri_engine_hardware_info,
+            set_hardware_tri_engine_preference,
             inspect_media,
             render_clip,
             cancel_render,

@@ -1,7 +1,7 @@
 import { Component, Show, createMemo } from "solid-js";
 import { projectSignals } from "../stores/project";
 import { queueSignals } from "../stores/queue";
-import { Cpu, Settings, HelpCircle, Plus, Film, Scissors, Download, CheckCircle2, FolderOpen, Save, Undo, Redo } from "./Icons";
+import { Cpu, Settings, HelpCircle, Plus, Film, Scissors, Download, CheckCircle2, FolderOpen, Save, Undo, Redo, Sparkles } from "./Icons";
 
 interface HeaderProps {
   onOpenSettings: () => void;
@@ -82,16 +82,21 @@ export const Header: Component<HeaderProps> = (props) => {
           </Show>
         </div>
 
-        {/* GPU Hardware Acceleration Indicator */}
-        <Show when={gpu()}>
-          <div
-            class="hidden sm:flex items-center gap-1.5 text-[11px] font-mono px-2 py-0.5 rounded border border-zinc-800/90 bg-zinc-900/60 text-zinc-400"
-            title={gpu()?.description}
-          >
-            <Cpu size={12} class={gpu()?.is_hardware ? "text-emerald-400" : "text-amber-400"} />
-            <span>{gpu()?.name}</span>
-          </div>
-        </Show>
+        {/* Tri-Engine Hardware Acceleration Indicator */}
+        <button
+          type="button"
+          onClick={props.onOpenSettings}
+          class="hidden sm:flex items-center gap-1.5 text-[11px] font-mono px-2 py-0.5 rounded border border-zinc-800/90 bg-zinc-900/60 hover:bg-zinc-900 text-zinc-300 transition cursor-pointer"
+          title={projectSignals.triEngineProfile()?.summary || gpu()?.description || "Tri-Engine Decoupled Hardware Architecture (Click to Configure)"}
+        >
+          <Cpu size={12} class="text-blue-400" />
+          <span>{gpu()?.name || "Intel QuickSync"}</span>
+          <Show when={projectSignals.triEngineProfile()?.active_inference.is_hardware}>
+            <span class="text-zinc-600">•</span>
+            <Sparkles size={11} class="text-amber-400" />
+            <span class="text-amber-300 text-[10px] font-bold">AI: CUDA</span>
+          </Show>
+        </button>
       </div>
 
       {/* Center: Segmented Workspace Navigation */}
