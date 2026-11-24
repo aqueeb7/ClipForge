@@ -22,6 +22,8 @@ export const VideoPreview: Component = () => {
   let videoRef: HTMLVideoElement | undefined;
   let audioRef: HTMLAudioElement | undefined;
   let wideCanvasRef: HTMLDivElement | undefined;
+  let verticalCanvasRef: HTMLCanvasElement | undefined;
+  let animationFrameId: number | null = null;
 
   const [videoLoadError, setVideoLoadError] = createSignal<string | null>(null);
   const [isMasterMuted, setIsMasterMuted] = createSignal(false);
@@ -80,6 +82,7 @@ export const VideoPreview: Component = () => {
       vid.muted = isVideoMuted();
       vid.volume = volume();
     }
+    renderVerticalCanvasFrame();
   }
 
   function handleVideoError(e: Event) {
@@ -94,6 +97,7 @@ export const VideoPreview: Component = () => {
     if (videoRef && timelineSignals.isPlaying()) {
       timelineSignals.setCurrentTime(videoRef.currentTime);
     }
+    renderVerticalCanvasFrame();
   }
 
   function syncAudioPlayback(playing: boolean) {
@@ -254,6 +258,7 @@ export const VideoPreview: Component = () => {
         audioRef.currentTime = targetAudioTime;
       }
     }
+    renderVerticalCanvasFrame();
   });
 
   createEffect(() => {
@@ -267,6 +272,145 @@ export const VideoPreview: Component = () => {
       }
     }
     syncAudioPlayback(playing);
+  });
+
+  function drawCover(
+    ctx: CanvasRenderingContext2D,
+    img: CanvasImageSource,
+    sx: number,
+    sy: number,
+    sw: number,
+    sh: number,
+    dx: number,
+    dy: number,
+    dw: number,
+    dh: number
+  ) {
+    if (sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0) return;
+    const srcRatio = sw / sh;
+    const dstRatio = dw / dh;
+
+    let cropW = sw;
+    let cropH = sh;
+    let cropX = sx;
+    let cropY = sy;
+
+    if (srcRatio > dstRatio) {
+      cropW = sh * dstRatio;
+      cropX = sx + (sw - cropW) / 2;
+    } else {
+      cropH = sw / dstRatio;
+      cropY = sy + (sh - cropH) / 2;
+    }
+
+    ctx.drawImage(img, cropX, cropY, cropW, cropH, dx, dy, dw, dh);
+  }
+
+  function renderVerticalCanvasFrame() {
+    if (!verticalCanvasRef || !videoRef) return;
+    if (videoRef.readyState < 2 || !videoRef.videoWidth || !videoRef.videoHeight) return;
+
+    const ctx = verticalCanvasRef.getContext("2d");
+    if (!ctx) return;
+
+    const cw = verticalCanvasRef.width;
+    const ch = verticalCanvasRef.height;
+    const vw = videoRef.videoWidth;
+    const vh = videoRef.videoHeight;
+    const tmpl = currentTemplate();
+
+    ctx.clearRect(0, 0, cw, ch);
+
+    if (tmpl === "blur_fill") {
+      const isBlur = (composition()?.background?.mode || "blur") === "blur";
+      if (isBlur) {
+        ctx.save();
+        ctx.filter = "blur(14px) brightness(0.6)";
+        ctx.drawImage(videoRef, 0, 0, cw, ch);
+        ctx.restore();
+      } else {
+        ctx.fillStyle = composition()?.background?.color || "#09090b";
+        ctx.fillRect(0, 0, cw, ch);
+      }
+      const targetH = cw * (vh / vw);
+      const targetY = (ch - targetH) / 2;
+      ctx.drawImage(videoRef, 0, targetY, cw, targetH);
+    } else if (tmpl === "stacked_split" || tmpl === "split_50_50") {
+      const topPct = topHeightPct() / 100;
+      const topH = Math.round(ch * topPct);
+      const btmH = ch - topH;
+
+      // Top Zone: Facecam
+      const tr = topRegion();
+      const sx = Math.max(0, Math.min(vw, (tr.x / 100) * vw));
+      const sy = Math.max(0, Math.min(vh, (tr.y / 100) * vh));
+      const sw = Math.max(1, Math.min(vw - sx, (tr.width / 100) * vw));
+      const sh = Math.max(1, Math.min(vh - sy, (tr.height / 100) * vh));
+      drawCover(ctx, videoRef, sx, sy, sw, sh, 0, 0, cw, topH);
+
+      // Clean divider line
+      ctx.fillStyle = "#18181b";
+      ctx.fillRect(0, topH - 1, cw, 2);
+
+      // Bottom Zone: Gameplay / Screen
+      const br = bottomRegion();
+      const bx = Math.max(0, Math.min(vw, (br.x / 100) * vw));
+      const by = Math.max(0, Math.min(vh, (br.y / 100) * vh));
+      const bw = Math.max(1, Math.min(vw - bx, (br.width / 100) * vw));
+      const bh = Math.max(1, Math.min(vh - by, (br.height / 100) * vh));
+      drawCover(ctx, videoRef, bx, by, bw, bh, 0, topH, cw, btmH);
+    } else if (tmpl === "pan_scan") {
+      const pan = cropRegion();
+      const cropW = (9 / 16) * vh;
+      const px = Math.min(Math.max(0, (pan.x / 100) * vw), vw - cropW);
+      ctx.drawImage(videoRef, px, 0, cropW, vh, 0, 0, cw, ch);
+    }
+  }
+
+  function startCanvasRenderLoop() {
+    if (animationFrameId !== null) return;
+    const loop = () => {
+      renderVerticalCanvasFrame();
+      if (timelineSignals.isPlaying()) {
+        animationFrameId = requestAnimationFrame(loop);
+      } else {
+        animationFrameId = null;
+      }
+    };
+    animationFrameId = requestAnimationFrame(loop);
+  }
+
+  function stopCanvasRenderLoop() {
+    if (animationFrameId !== null) {
+      cancelAnimationFrame(animationFrameId);
+      animationFrameId = null;
+    }
+  }
+
+  createEffect(() => {
+    // Redraw whenever playback time or composition settings change
+    timelineSignals.currentTime();
+    topRegion();
+    bottomRegion();
+    cropRegion();
+    topHeightPct();
+    currentTemplate();
+    composition();
+    viewMode();
+    renderVerticalCanvasFrame();
+  });
+
+  createEffect(() => {
+    if (timelineSignals.isPlaying()) {
+      startCanvasRenderLoop();
+    } else {
+      stopCanvasRenderLoop();
+      renderVerticalCanvasFrame();
+    }
+  });
+
+  onCleanup(() => {
+    stopCanvasRenderLoop();
   });
 
   return (
@@ -397,113 +541,113 @@ export const VideoPreview: Component = () => {
       {/* Main Expansive Monitor Canvas Stage */}
       <div class="flex-1 min-h-0 bg-black flex items-center justify-center p-3 relative overflow-hidden gap-4">
         {/* ==================== VIEW 1: 16:9 WIDE SOURCE FEED ==================== */}
-        <Show when={viewMode() === "wide" || viewMode() === "dual"}>
-          <div
-            ref={wideCanvasRef}
-            class={`relative h-full aspect-video bg-zinc-950 rounded-lg overflow-hidden border border-zinc-800 shadow-2xl flex items-center justify-center ${
-              viewMode() === "dual" ? "max-w-[62%]" : "w-full max-w-5xl"
-            }`}
-            onClick={togglePlayback}
+        <div
+          ref={wideCanvasRef}
+          class={`relative h-full aspect-video bg-zinc-950 rounded-lg overflow-hidden border border-zinc-800 shadow-2xl items-center justify-center ${
+            viewMode() === "vertical" ? "hidden" : "flex"
+          } ${
+            viewMode() === "dual" ? "max-w-[62%]" : "w-full max-w-5xl"
+          }`}
+          onClick={togglePlayback}
+        >
+          <Show
+            when={videoUrl()}
+            fallback={
+              <div class="flex flex-col items-center justify-center gap-1.5 p-6 text-center text-zinc-500 text-xs">
+                <span class="font-medium text-zinc-400">No source video loaded</span>
+                <span class="text-[10px] text-zinc-600">Import stream or file via Media Pool</span>
+              </div>
+            }
           >
-            <Show
-              when={videoUrl()}
-              fallback={
-                <div class="flex flex-col items-center justify-center gap-1.5 p-6 text-center text-zinc-500 text-xs">
-                  <span class="font-medium text-zinc-400">No source video loaded</span>
-                  <span class="text-[10px] text-zinc-600">Import stream or file via Media Pool</span>
-                </div>
-              }
-            >
-              <video
-                ref={videoRef}
-                src={videoUrl()!}
-                class="w-full h-full object-contain pointer-events-none"
-                onLoadedMetadata={handleLoadedMetadata}
-                onTimeUpdate={handleTimeUpdate}
-                onError={handleVideoError}
-                playsinline
-              />
+            <video
+              ref={videoRef}
+              src={videoUrl()!}
+              class="w-full h-full object-contain pointer-events-none"
+              onLoadedMetadata={handleLoadedMetadata}
+              onTimeUpdate={handleTimeUpdate}
+              onError={handleVideoError}
+              playsinline
+            />
 
-              <Show when={hasDedicatedAudio()}>
-                <audio ref={audioRef} src={audioUrl()!} />
-              </Show>
+            <Show when={hasDedicatedAudio()}>
+              <audio ref={audioRef} src={audioUrl()!} />
+            </Show>
 
-              {/* Interactive Bounding Boxes Overlay for Stacking */}
-              <Show when={showCropControls() && currentTemplate() !== "blur_fill"}>
-                <div class="absolute inset-0 pointer-events-none z-20">
-                  {/* Template: Stacked Split (Cam + Game) */}
-                  <Show when={currentTemplate() === "stacked_split" || currentTemplate() === "split_50_50"}>
-                    {/* Top Zone: Facecam */}
-                    <div
-                      class={`absolute border-2 border-cyan-400 bg-cyan-500/15 pointer-events-auto transition-all ${
-                        activeZone() === "top" ? "ring-2 ring-cyan-300 shadow-lg" : "opacity-80"
-                      }`}
-                      style={{
-                        left: `${topRegion().x}%`,
-                        top: `${topRegion().y}%`,
-                        width: `${topRegion().width}%`,
-                        height: `${topRegion().height}%`,
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveZone("top");
-                      }}
-                    >
-                      <div class="absolute -top-5 left-0 px-1.5 py-0.2 bg-cyan-500 text-black font-mono font-bold text-[9px] uppercase tracking-wider rounded-t">
-                        ZONE A: CAM / TOP ({topHeightPct()}%)
-                      </div>
+            {/* Interactive Bounding Boxes Overlay for Stacking */}
+            <Show when={showCropControls() && currentTemplate() !== "blur_fill"}>
+              <div class="absolute inset-0 pointer-events-none z-20">
+                {/* Template: Stacked Split (Cam + Game) */}
+                <Show when={currentTemplate() === "stacked_split" || currentTemplate() === "split_50_50"}>
+                  {/* Top Zone: Facecam */}
+                  <div
+                    class={`absolute border-2 border-cyan-400 bg-cyan-500/15 pointer-events-auto transition-all ${
+                      activeZone() === "top" ? "ring-2 ring-cyan-300 shadow-lg" : "opacity-80"
+                    }`}
+                    style={{
+                      left: `${topRegion().x}%`,
+                      top: `${topRegion().y}%`,
+                      width: `${topRegion().width}%`,
+                      height: `${topRegion().height}%`,
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveZone("top");
+                    }}
+                  >
+                    <div class="absolute -top-5 left-0 px-1.5 py-0.2 bg-cyan-500 text-black font-mono font-bold text-[9px] uppercase tracking-wider rounded-t">
+                      ZONE A: CAM / TOP ({topHeightPct()}%)
                     </div>
+                  </div>
 
-                    {/* Bottom Zone: Gameplay / Screen */}
-                    <div
-                      class={`absolute border-2 border-amber-400 bg-amber-500/15 pointer-events-auto transition-all ${
-                        activeZone() === "bottom" ? "ring-2 ring-amber-300 shadow-lg" : "opacity-80"
-                      }`}
-                      style={{
-                        left: `${bottomRegion().x}%`,
-                        top: `${bottomRegion().y}%`,
-                        width: `${bottomRegion().width}%`,
-                        height: `${bottomRegion().height}%`,
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveZone("bottom");
-                      }}
-                    >
-                      <div class="absolute -top-5 left-0 px-1.5 py-0.2 bg-amber-500 text-black font-mono font-bold text-[9px] uppercase tracking-wider rounded-t">
-                        ZONE B: GAME / ACTION ({100 - topHeightPct()}%)
-                      </div>
+                  {/* Bottom Zone: Gameplay / Screen */}
+                  <div
+                    class={`absolute border-2 border-amber-400 bg-amber-500/15 pointer-events-auto transition-all ${
+                      activeZone() === "bottom" ? "ring-2 ring-amber-300 shadow-lg" : "opacity-80"
+                    }`}
+                    style={{
+                      left: `${bottomRegion().x}%`,
+                      top: `${bottomRegion().y}%`,
+                      width: `${bottomRegion().width}%`,
+                      height: `${bottomRegion().height}%`,
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveZone("bottom");
+                    }}
+                  >
+                    <div class="absolute -top-5 left-0 px-1.5 py-0.2 bg-amber-500 text-black font-mono font-bold text-[9px] uppercase tracking-wider rounded-t">
+                      ZONE B: GAME / ACTION ({100 - topHeightPct()}%)
                     </div>
-                  </Show>
+                  </div>
+                </Show>
 
-                  {/* Template: Pan & Scan 9:16 Window */}
-                  <Show when={currentTemplate() === "pan_scan"}>
-                    <div
-                      class="absolute top-0 bottom-0 border-2 border-purple-400 bg-purple-500/15 pointer-events-auto transition-all shadow-xl"
-                      style={{
-                        left: `${cropRegion().x}%`,
-                        width: `${(100 * 9) / 16}%`,
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveZone("pan");
-                      }}
-                    >
-                      <div class="absolute top-2 left-2 px-1.5 py-0.5 bg-purple-500 text-white font-mono font-bold text-[9px] uppercase tracking-wider rounded">
-                        9:16 CROP FOCUS
-                      </div>
+                {/* Template: Pan & Scan 9:16 Window */}
+                <Show when={currentTemplate() === "pan_scan"}>
+                  <div
+                    class="absolute top-0 bottom-0 border-2 border-purple-400 bg-purple-500/15 pointer-events-auto transition-all shadow-xl"
+                    style={{
+                      left: `${cropRegion().x}%`,
+                      width: `${(100 * 9) / 16}%`,
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveZone("pan");
+                    }}
+                  >
+                    <div class="absolute top-2 left-2 px-1.5 py-0.5 bg-purple-500 text-white font-mono font-bold text-[9px] uppercase tracking-wider rounded">
+                      9:16 CROP FOCUS
                     </div>
-                  </Show>
-                </div>
-              </Show>
-
-              {/* Source Label Badge */}
-              <div class="absolute left-2.5 top-2.5 px-2 py-0.5 rounded bg-black/75 border border-zinc-700/60 text-zinc-300 font-mono text-[9px] uppercase tracking-wider pointer-events-none">
-                Master 16:9 Stream
+                  </div>
+                </Show>
               </div>
             </Show>
-          </div>
-        </Show>
+
+            {/* Source Label Badge */}
+            <div class="absolute left-2.5 top-2.5 px-2 py-0.5 rounded bg-black/75 border border-zinc-700/60 text-zinc-300 font-mono text-[9px] uppercase tracking-wider pointer-events-none">
+              Master 16:9 Stream
+            </div>
+          </Show>
+        </div>
 
         {/* ==================== VIEW 2: 9:16 VERTICAL SIMULATED OUTCOME ==================== */}
         <Show when={viewMode() === "vertical" || viewMode() === "dual"}>
@@ -511,113 +655,27 @@ export const VideoPreview: Component = () => {
             class="relative h-full aspect-[9/16] bg-zinc-950 rounded-lg overflow-hidden border border-zinc-800/90 shadow-2xl flex flex-col justify-between items-center cursor-pointer shrink-0"
             onClick={togglePlayback}
           >
-            {/* Template 1: Blur Background Fill */}
-            <Show when={currentTemplate() === "blur_fill"}>
-              <div class="absolute inset-0 overflow-hidden pointer-events-none z-0">
-                <Show
-                  when={composition()?.background?.mode === "blur"}
-                  fallback={
-                    <div
-                      class="w-full h-full"
-                      style={{ "background-color": composition()?.background?.color || "#000000" }}
-                    />
-                  }
-                >
-                  <div class="w-full h-full bg-zinc-900/90 backdrop-blur-md" style={{ "background-color": "#121216" }} />
-                </Show>
-              </div>
+            {/* Single High-Performance GPU Canvas Blit (Zero Extra Decoders) */}
+            <canvas
+              ref={verticalCanvasRef}
+              width={720}
+              height={1280}
+              class="absolute inset-0 w-full h-full object-contain pointer-events-none z-0 bg-black"
+            />
 
-              {/* Center 16:9 letterbox video */}
-              <div class="relative w-full flex-1 flex items-center justify-center overflow-hidden z-10">
-                <Show when={videoUrl()}>
-                  <video
-                    src={videoUrl()!}
-                    class="w-full h-auto object-contain pointer-events-none"
-                    ref={(el) => {
-                      createEffect(() => {
-                        if (el) el.currentTime = timelineSignals.currentTime();
-                      });
-                    }}
-                    muted
-                    playsinline
-                  />
-                </Show>
-              </div>
-            </Show>
-
-            {/* Template 2 & 4: Stacked Split / 50-50 Dual */}
+            {/* Template Zone Indicators for Cam + Game */}
             <Show when={currentTemplate() === "stacked_split" || currentTemplate() === "split_50_50"}>
-              <div class="absolute inset-0 flex flex-col z-0 overflow-hidden">
-                {/* Top Section (Cam / Speaker) */}
-                <div
-                  class="relative w-full overflow-hidden bg-zinc-900 border-b border-zinc-800"
-                  style={{ height: `${topHeightPct()}%` }}
-                >
-                  <Show when={videoUrl()}>
-                    <video
-                      src={videoUrl()!}
-                      class="w-full h-full object-cover pointer-events-none"
-                      style={{
-                        "object-position": `${topRegion().x + topRegion().width / 2}% ${topRegion().y + topRegion().height / 2}%`
-                      }}
-                      ref={(el) => {
-                        createEffect(() => {
-                          if (el) el.currentTime = timelineSignals.currentTime();
-                        });
-                      }}
-                      muted
-                      playsinline
-                    />
-                  </Show>
-                  <div class="absolute bottom-1 right-1 px-1 py-0.2 rounded bg-black/70 text-cyan-300 font-mono text-[8px] uppercase">
-                    Cam
-                  </div>
+              <div class="absolute inset-0 pointer-events-none z-10 flex flex-col justify-between">
+                <div class="w-full flex justify-end p-2" style={{ height: `${topHeightPct()}%` }}>
+                  <span class="self-end px-1.5 py-0.5 rounded bg-black/75 text-cyan-300 font-mono text-[9px] uppercase tracking-wider border border-cyan-500/30">
+                    Zone A: Cam
+                  </span>
                 </div>
-
-                {/* Bottom Section (Action / Gameplay) */}
-                <div class="relative w-full flex-1 overflow-hidden bg-zinc-950">
-                  <Show when={videoUrl()}>
-                    <video
-                      src={videoUrl()!}
-                      class="w-full h-full object-cover pointer-events-none"
-                      style={{
-                        "object-position": `${bottomRegion().x + bottomRegion().width / 2}% ${bottomRegion().y + bottomRegion().height / 2}%`
-                      }}
-                      ref={(el) => {
-                        createEffect(() => {
-                          if (el) el.currentTime = timelineSignals.currentTime();
-                        });
-                      }}
-                      muted
-                      playsinline
-                    />
-                  </Show>
-                  <div class="absolute bottom-1 right-1 px-1 py-0.2 rounded bg-black/70 text-amber-300 font-mono text-[8px] uppercase">
-                    Game
-                  </div>
+                <div class="w-full flex justify-end p-2 flex-1">
+                  <span class="self-end px-1.5 py-0.5 rounded bg-black/75 text-amber-300 font-mono text-[9px] uppercase tracking-wider border border-amber-500/30">
+                    Zone B: Game
+                  </span>
                 </div>
-              </div>
-            </Show>
-
-            {/* Template 3: Pan & Scan 9:16 Direct Crop */}
-            <Show when={currentTemplate() === "pan_scan"}>
-              <div class="absolute inset-0 overflow-hidden z-0 bg-black">
-                <Show when={videoUrl()}>
-                  <video
-                    src={videoUrl()!}
-                    class="w-full h-full object-cover pointer-events-none"
-                    style={{
-                      "object-position": `${cropRegion().x + 28}% center`
-                    }}
-                    ref={(el) => {
-                      createEffect(() => {
-                        if (el) el.currentTime = timelineSignals.currentTime();
-                      });
-                    }}
-                    muted
-                    playsinline
-                  />
-                </Show>
               </div>
             </Show>
 
