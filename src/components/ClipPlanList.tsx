@@ -60,6 +60,18 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
     return list;
   });
 
+  // Fast single-pass active clip memo to eliminate 100+ reactive evaluations per frame
+  const activeClipId = createMemo(() => {
+    const t = timelineSignals.currentTime();
+    if (activeTab() === "parts") {
+      const found = clips().find((c) => t >= c.sourceStartSeconds && t < c.sourceEndSeconds);
+      return found ? found.id : null;
+    } else {
+      const found = shortClips().find((s) => t >= s.start && t < s.end);
+      return found ? found.id : null;
+    }
+  });
+
   function formatTime(seconds: number): string {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -184,7 +196,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
         </div>
 
         {/* Tier 2: Filter Pills & Batch Action Toolbar */}
-        <div class="flex items-center justify-between gap-2 text-xs">
+        <div class="flex items-center justify-between gap-1.5 text-xs">
           {/* Filter Pills */}
           <div class="flex items-center gap-0.5 bg-zinc-950 p-0.5 rounded-md border border-zinc-800 text-[10px] shrink-0">
             <button
@@ -201,7 +213,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
             <button
               type="button"
               onClick={() => setFilter("ready")}
-              class={`px-2 py-0.5 rounded transition cursor-pointer flex items-center gap-1 whitespace-nowrap ${
+              class={`px-1.5 py-0.5 rounded transition cursor-pointer flex items-center gap-1 whitespace-nowrap ${
                 filter() === "ready"
                   ? "bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 font-semibold"
                   : "text-zinc-500 hover:text-zinc-300"
@@ -215,7 +227,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
             <button
               type="button"
               onClick={() => setFilter("queued")}
-              class={`px-2 py-0.5 rounded transition cursor-pointer flex items-center gap-1 whitespace-nowrap ${
+              class={`px-1.5 py-0.5 rounded transition cursor-pointer flex items-center gap-1 whitespace-nowrap ${
                 filter() === "queued"
                   ? "bg-zinc-800 text-zinc-200 font-semibold"
                   : "text-zinc-500 hover:text-zinc-300"
@@ -229,7 +241,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
           </div>
 
           {/* Action Buttons */}
-          <div class="flex items-center gap-1.5 shrink-0">
+          <div class="flex items-center gap-1 shrink-0">
             <Show when={activeTab() === "parts"}>
               <Show when={renderedCount() > 0}>
                 <button
@@ -338,9 +350,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                   const isCurrentlyRendering = () =>
                     queueItem()?.status === "rendering" ||
                     queueSignals.singleRenderingClipId() === short.id;
-                  const isPlayingCurrent = () =>
-                    timelineSignals.currentTime() >= short.start &&
-                    timelineSignals.currentTime() < short.end;
+                  const isPlayingCurrent = () => activeClipId() === short.id;
 
                   const templateLabel = () => {
                     switch (short.framingTemplate) {
@@ -360,8 +370,8 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                     <div
                       class={`p-2.5 rounded-lg border transition flex flex-col gap-1.5 ${
                         isPlayingCurrent()
-                          ? "bg-amber-950/20 border-amber-500/50 ring-1 ring-amber-500/30"
-                          : "bg-zinc-900/40 hover:bg-zinc-900/80 border-zinc-800/80 hover:border-zinc-700/80"
+                          ? "bg-amber-950/30 border-amber-500/60 ring-1 ring-amber-500/40 shadow-sm"
+                          : "bg-zinc-900/50 hover:bg-zinc-900/90 border-zinc-800/80 hover:border-zinc-700/80"
                       }`}
                     >
                       {/* Row 1: Header - Play + Title + Time + Status */}
@@ -380,7 +390,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                             <Play size={10} />
                           </button>
 
-                          <span class="font-bold text-amber-200 text-xs shrink-0 truncate max-w-[140px] whitespace-nowrap">
+                          <span class="font-bold font-mono text-amber-200 text-xs px-1.5 py-0.5 rounded bg-amber-950/60 border border-amber-800/50 shrink-0 whitespace-nowrap">
                             {short.title || `Short #${idx() + 1}`}
                           </span>
 
@@ -400,11 +410,11 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                           </Show>
 
                           <Show when={isRendered() && !isCurrentlyRendering()}>
-                            <div class="flex items-center gap-1 text-[10px] font-mono text-emerald-300 bg-emerald-950/70 border border-emerald-800/60 px-2 py-0.5 rounded-full">
+                            <div class="flex items-center gap-1 text-[10px] font-mono text-emerald-300 bg-emerald-950/80 border border-emerald-800/70 px-2 py-0.5 rounded-full">
                               <CheckCircle2 size={10} />
                               <span>Ready</span>
                               <Show when={renderedInfo()?.fileSizeBytes}>
-                                <span class="opacity-80">({formatFileSize(renderedInfo()!.fileSizeBytes)})</span>
+                                <span class="opacity-80 font-normal">({formatFileSize(renderedInfo()!.fileSizeBytes)})</span>
                               </Show>
                             </div>
                           </Show>
@@ -418,18 +428,18 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                       </div>
 
                       {/* Row 2: Template Tag + Filename */}
-                      <div class="flex items-center gap-2 pl-8 text-[10px]">
-                        <span class="font-mono uppercase px-1.5 py-0.2 rounded bg-amber-950/50 border border-amber-800/40 text-amber-300 shrink-0">
+                      <div class="flex items-center gap-2 pl-8 text-[10px] min-w-0">
+                        <span class="font-mono uppercase px-1.5 py-0.2 rounded bg-amber-950/50 border border-amber-800/40 text-amber-300 shrink-0 whitespace-nowrap">
                           {templateLabel()}
                         </span>
-                        <span class="font-mono text-zinc-500 truncate">
+                        <span class="font-mono text-zinc-500 truncate" title={clip().outputName}>
                           {clip().outputName}
                         </span>
                       </div>
 
                       {/* Row 3: Action Buttons & Delete */}
                       <div class="flex items-center justify-between gap-2 pt-0.5 pl-8">
-                        <div class="flex items-center gap-1 text-[10px] text-zinc-500 font-mono">
+                        <div class="flex items-center gap-1 text-[10px] text-zinc-500 font-mono shrink-0 whitespace-nowrap">
                           <span>9:16 Vertical</span>
                         </div>
 
@@ -441,7 +451,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                                 type="button"
                                 disabled={isCurrentlyRendering()}
                                 onClick={() => handleRenderSingleShort(short, idx())}
-                                class="h-6 px-2.5 rounded bg-amber-600 hover:bg-amber-500 text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm cursor-pointer disabled:opacity-50"
+                                class="h-6 px-2.5 rounded bg-amber-600 hover:bg-amber-500 text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm cursor-pointer disabled:opacity-50 shrink-0 whitespace-nowrap"
                                 title="Render 9:16 vertical short"
                               >
                                 <Download size={10} />
@@ -452,7 +462,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                             <button
                               type="button"
                               onClick={() => handleOpenFile(short.id)}
-                              class="h-6 px-2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-medium flex items-center gap-1 transition cursor-pointer border border-zinc-700/60"
+                              class="h-6 px-2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-medium flex items-center gap-1 transition cursor-pointer border border-zinc-700/60 shrink-0 whitespace-nowrap"
                               title="Show exported file in folder"
                             >
                               <ExternalLink size={10} />
@@ -462,7 +472,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                             <button
                               type="button"
                               onClick={() => props.onPublishClip?.(clip())}
-                              class="h-6 px-2.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm cursor-pointer"
+                              class="h-6 px-2.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm cursor-pointer shrink-0 whitespace-nowrap"
                               title="Publish to YouTube Shorts, Reels, or TikTok"
                             >
                               <Share size={10} />
@@ -473,7 +483,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                               type="button"
                               disabled={isCurrentlyRendering()}
                               onClick={() => handleRenderSingleShort(short, idx())}
-                              class="h-6 px-1.5 rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 text-[10px] flex items-center gap-1 transition cursor-pointer"
+                              class="h-6 px-1.5 rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 text-[10px] flex items-center gap-1 transition cursor-pointer shrink-0"
                               title="Re-render this short"
                             >
                               <RefreshCw size={10} />
@@ -483,7 +493,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                           <button
                             type="button"
                             onClick={() => projectSignals.removeShortClip(short.id)}
-                            class="w-6 h-6 rounded hover:bg-red-950/50 text-zinc-500 hover:text-red-400 flex items-center justify-center transition cursor-pointer"
+                            class="w-6 h-6 rounded hover:bg-red-950/50 text-zinc-500 hover:text-red-400 flex items-center justify-center transition cursor-pointer shrink-0"
                             title="Delete short from timeline"
                           >
                             <Trash2 size={11} />
@@ -523,16 +533,14 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                 const isCurrentlyRendering = () =>
                   queueItem()?.status === "rendering" ||
                   queueSignals.singleRenderingClipId() === clip.id;
-                const isPlayingCurrent = () =>
-                  timelineSignals.currentTime() >= clip.sourceStartSeconds &&
-                  timelineSignals.currentTime() < clip.sourceEndSeconds;
+                const isPlayingCurrent = () => activeClipId() === clip.id;
 
                 return (
                   <div
                     class={`p-2.5 rounded-lg border transition flex flex-col gap-1.5 ${
                       isPlayingCurrent()
-                        ? "bg-blue-950/25 border-blue-500/50 ring-1 ring-blue-500/30"
-                        : "bg-zinc-900/40 hover:bg-zinc-900/80 border-zinc-800/80 hover:border-zinc-700/80"
+                        ? "bg-blue-950/30 border-blue-500/60 ring-1 ring-blue-500/40 shadow-sm"
+                        : "bg-zinc-900/50 hover:bg-zinc-900/90 border-zinc-800/80 hover:border-zinc-700/80"
                     }`}
                   >
                     {/* Row 1: Header - Play button + Title + Timecode + Status Badge */}
@@ -551,7 +559,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                           <Play size={10} />
                         </button>
 
-                        <span class="font-bold text-zinc-100 text-xs shrink-0 whitespace-nowrap">
+                        <span class="font-bold font-mono text-zinc-100 text-xs px-1.5 py-0.5 rounded bg-zinc-800/80 border border-zinc-700/60 shrink-0 whitespace-nowrap">
                           {clip.title}
                         </span>
 
@@ -571,11 +579,11 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                         </Show>
 
                         <Show when={isRendered() && !isCurrentlyRendering()}>
-                          <div class="flex items-center gap-1 text-[10px] font-mono text-emerald-300 bg-emerald-950/70 border border-emerald-800/60 px-2 py-0.5 rounded-full">
+                          <div class="flex items-center gap-1 text-[10px] font-mono text-emerald-300 bg-emerald-950/80 border border-emerald-800/70 px-2 py-0.5 rounded-full">
                             <CheckCircle2 size={10} />
                             <span>Ready</span>
                             <Show when={renderedInfo()?.fileSizeBytes}>
-                              <span class="opacity-80">({formatFileSize(renderedInfo()!.fileSizeBytes)})</span>
+                              <span class="opacity-80 font-normal">({formatFileSize(renderedInfo()!.fileSizeBytes)})</span>
                             </Show>
                           </div>
                         </Show>
@@ -589,7 +597,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                     </div>
 
                     {/* Row 2: Clean Filename */}
-                    <div class="text-[10px] font-mono text-zinc-500 truncate pl-8">
+                    <div class="text-[10px] font-mono text-zinc-500 truncate pl-8" title={clip.outputName}>
                       {clip.outputName}
                     </div>
 
@@ -610,7 +618,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                             <div class="flex items-center gap-1 flex-wrap">
                               <Show when={hasYT}>
                                 <span
-                                  class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-red-950/60 text-red-300 border border-red-800/50 text-[9px] font-medium"
+                                  class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-red-950/60 text-red-300 border border-red-800/50 text-[9px] font-medium shrink-0 whitespace-nowrap"
                                   title="Uploaded to YouTube Shorts"
                                 >
                                   <YouTubeIcon size={9} class="text-red-500" />
@@ -632,14 +640,14 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                               </Show>
 
                               <Show when={hasInsta}>
-                                <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-pink-950/60 text-pink-300 border border-pink-800/50 text-[9px] font-medium">
+                                <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-pink-950/60 text-pink-300 border border-pink-800/50 text-[9px] font-medium shrink-0 whitespace-nowrap">
                                   <InstagramIcon size={9} class="text-pink-400" />
                                   <span>Reels</span>
                                 </span>
                               </Show>
 
                               <Show when={hasTT}>
-                                <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-800/50 text-[9px] font-medium">
+                                <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-800/50 text-[9px] font-medium shrink-0 whitespace-nowrap">
                                   <TikTokIcon size={9} class="text-cyan-400" />
                                   <span>TikTok</span>
                                 </span>
@@ -658,7 +666,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                               type="button"
                               disabled={isCurrentlyRendering()}
                               onClick={() => handleRenderSingleClip(clip)}
-                              class="h-6 px-2.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm cursor-pointer disabled:opacity-50"
+                              class="h-6 px-2.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm cursor-pointer disabled:opacity-50 shrink-0 whitespace-nowrap"
                               title="Render this clip now"
                             >
                               <Download size={10} />
@@ -669,7 +677,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                           <button
                             type="button"
                             onClick={() => handleOpenFile(clip.id)}
-                            class="h-6 px-2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-medium flex items-center gap-1 transition cursor-pointer border border-zinc-700/60"
+                            class="h-6 px-2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-medium flex items-center gap-1 transition cursor-pointer border border-zinc-700/60 shrink-0 whitespace-nowrap"
                             title="Show exported file in folder"
                           >
                             <ExternalLink size={10} />
@@ -679,7 +687,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                           <button
                             type="button"
                             onClick={() => props.onPublishClip?.(clip)}
-                            class="h-6 px-2.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm cursor-pointer"
+                            class="h-6 px-2.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm cursor-pointer shrink-0 whitespace-nowrap"
                             title="Publish to YouTube Shorts, Reels, or TikTok"
                           >
                             <Share size={10} />
@@ -690,7 +698,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                             type="button"
                             disabled={isCurrentlyRendering()}
                             onClick={() => handleRenderSingleClip(clip)}
-                            class="h-6 px-1.5 rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 text-[10px] flex items-center gap-1 transition cursor-pointer"
+                            class="h-6 px-1.5 rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 text-[10px] flex items-center gap-1 transition cursor-pointer shrink-0"
                             title="Re-render this clip"
                           >
                             <RefreshCw size={10} />

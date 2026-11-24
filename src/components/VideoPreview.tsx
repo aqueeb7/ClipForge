@@ -97,7 +97,6 @@ export const VideoPreview: Component = () => {
     if (videoRef && timelineSignals.isPlaying()) {
       timelineSignals.setCurrentTime(videoRef.currentTime);
     }
-    renderVerticalCanvasFrame();
   }
 
   function syncAudioPlayback(playing: boolean) {
@@ -107,7 +106,7 @@ export const VideoPreview: Component = () => {
 
     if (playing) {
       if (targetAudioTime >= 0) {
-        if (Math.abs(audioRef.currentTime - targetAudioTime) > 0.08) {
+        if (Math.abs(audioRef.currentTime - targetAudioTime) > 0.25) {
           audioRef.currentTime = targetAudioTime;
         }
         audioRef.muted = isDedicatedMuted();
@@ -249,16 +248,36 @@ export const VideoPreview: Component = () => {
 
   createEffect(() => {
     const newTime = timelineSignals.currentTime();
-    if (videoRef && Math.abs(videoRef.currentTime - newTime) > 0.3) {
-      videoRef.currentTime = newTime;
-    }
-    if (audioRef && audioUrl()) {
-      const targetAudioTime = newTime + audioOffsetMs() / 1000;
-      if (targetAudioTime >= 0 && Math.abs(audioRef.currentTime - targetAudioTime) > 0.15) {
-        audioRef.currentTime = targetAudioTime;
+    const playing = timelineSignals.isPlaying();
+
+    // Master Clock: When playing, videoRef drives timelineSignals.currentTime naturally.
+    // We only seek videoRef if paused (user dragging scrubber) or if there's an explicit jump (> 1.2s drift).
+    if (videoRef) {
+      const delta = Math.abs(videoRef.currentTime - newTime);
+      if (!playing && delta > 0.04) {
+        videoRef.currentTime = newTime;
+      } else if (playing && delta > 1.2) {
+        // User clicked a distant marker/chapter while playing
+        videoRef.currentTime = newTime;
       }
     }
-    renderVerticalCanvasFrame();
+
+    if (audioRef && audioUrl()) {
+      const targetAudioTime = newTime + audioOffsetMs() / 1000;
+      if (targetAudioTime >= 0) {
+        const audioDelta = Math.abs(audioRef.currentTime - targetAudioTime);
+        if (!playing && audioDelta > 0.05) {
+          audioRef.currentTime = targetAudioTime;
+        } else if (playing && audioDelta > 0.35) {
+          audioRef.currentTime = targetAudioTime;
+        }
+      }
+    }
+
+    // Only render canvas on static time change when paused (requestAnimationFrame loop handles playing state)
+    if (!playing) {
+      renderVerticalCanvasFrame();
+    }
   });
 
   createEffect(() => {
@@ -388,8 +407,7 @@ export const VideoPreview: Component = () => {
   }
 
   createEffect(() => {
-    // Redraw whenever playback time or composition settings change
-    timelineSignals.currentTime();
+    // Redraw whenever composition framing settings change while paused
     topRegion();
     bottomRegion();
     cropRegion();
@@ -397,7 +415,9 @@ export const VideoPreview: Component = () => {
     currentTemplate();
     composition();
     viewMode();
-    renderVerticalCanvasFrame();
+    if (!timelineSignals.isPlaying()) {
+      renderVerticalCanvasFrame();
+    }
   });
 
   createEffect(() => {
@@ -566,11 +586,21 @@ export const VideoPreview: Component = () => {
               onLoadedMetadata={handleLoadedMetadata}
               onTimeUpdate={handleTimeUpdate}
               onError={handleVideoError}
+              onEnded={() => {
+                timelineSignals.pause();
+                syncAudioPlayback(false);
+              }}
               playsinline
             />
 
             <Show when={hasDedicatedAudio()}>
-              <audio ref={audioRef} src={audioUrl()!} />
+              <audio
+                ref={audioRef}
+                src={audioUrl()!}
+                onEnded={() => {
+                  timelineSignals.pause();
+                }}
+              />
             </Show>
 
             {/* Interactive Bounding Boxes Overlay for Stacking */}
