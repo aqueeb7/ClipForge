@@ -48,14 +48,8 @@ export const ProjectManagerModal: Component<ProjectManagerModalProps> = (props) 
     }
   }
 
-  function handleResumeDraft(draft: SavedProjectDraft) {
-    if (draft.filePath && draft.filePath.endsWith(".json")) {
-      projectSignals.openProject(draft.filePath);
-    }
-    if (draft.resumeTime && draft.resumeTime > 0) {
-      timelineSignals.setCurrentTime(draft.resumeTime);
-    }
-    projectSignals.setWorkspaceTab("edit");
+  async function handleResumeDraft(draft: SavedProjectDraft) {
+    await projectSignals.resumeDraft(draft);
     props.onClose();
   }
 

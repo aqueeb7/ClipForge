@@ -36,7 +36,8 @@ import {
   saveProjectDraft,
   getSavedDrafts,
   deleteProjectDraft,
-  type SavedProjectDraft
+  type SavedProjectDraft,
+  type SessionSnapshot
 } from "../services/persistence.js";
 
 // Core Signals
@@ -752,18 +753,23 @@ function autoSave(currentTime = 0, zoomLevel = 1, isTimelineExpanded = false) {
   const vMeta = videoMetadata();
   if (!proj && !vMeta) return;
 
-  saveSessionState({
+  const currentShorts = shortClips();
+  const stage = timelineStage();
+  const isPatched = isMasterPatched();
+  const mode = workflowMode();
+
+  const snapshot: SessionSnapshot = {
     version: 1,
     savedAt: new Date().toISOString(),
-    project: proj,
+    project: proj ? { ...proj, shorts: currentShorts, workflowMode: mode } : null,
     videoMetadata: vMeta,
     audioMetadata: audioMetadata(),
     masterInSeconds: masterInSeconds(),
     masterOutSeconds: masterOutSeconds(),
-    isMasterPatched: isMasterPatched(),
-    timelineStage: timelineStage(),
-    workflowMode: workflowMode(),
-    shortClips: shortClips(),
+    isMasterPatched: isPatched,
+    timelineStage: stage,
+    workflowMode: mode,
+    shortClips: currentShorts,
     activeWorkspaceTab: activeWorkspaceTab(),
     isVideoAudioMuted: isVideoAudioMuted(),
     isDedicatedAudioMuted: isDedicatedAudioMuted(),
@@ -771,24 +777,28 @@ function autoSave(currentTime = 0, zoomLevel = 1, isTimelineExpanded = false) {
     currentTime,
     zoomLevel,
     isTimelineExpanded
-  });
+  };
+
+  saveSessionState(snapshot);
 
   if (proj) {
+    const targetPath = projectFilePath() || (streamProjectDir() ? `${streamProjectDir()}/project.json` : `draft_${proj.id}.json`);
     saveProjectDraft({
       id: proj.id,
       name: proj.name,
-      filePath: projectFilePath() || (streamProjectDir() ? `${streamProjectDir()}/project.json` : `draft_${proj.id}`),
+      filePath: targetPath,
       projectDir: streamProjectDir() || undefined,
       videoPath: proj.sources.video?.path,
       audioPath: proj.sources.audio?.path,
       clipsCount: currentManifest()?.clips?.length || (proj.clipSettings.mode === "manual" ? proj.clipSettings.clips.length : 0),
-      shortsCount: shortClips().length,
-      workflowMode: workflowMode(),
+      shortsCount: currentShorts.length,
+      workflowMode: mode,
       resumeTime: currentTime,
       candidatesCount: 0,
       hasChat: false,
       status: "in_progress",
       lastSaved: new Date().toISOString(),
+      snapshot,
     });
   }
 }
@@ -805,9 +815,12 @@ async function restoreAutoSavedSession(): Promise<boolean> {
     setVideoMetadata(snapshot.videoMetadata);
     setAudioMetadata(snapshot.audioMetadata);
     setMasterInSecondsState(snapshot.masterInSeconds || 0);
-    setMasterOutSecondsState(snapshot.masterOutSeconds || snapshot.videoMetadata?.durationSeconds || 60);
-    setIsMasterPatched(snapshot.isMasterPatched || false);
-    setTimelineStageState(snapshot.timelineStage || "master");
+    setMasterOutSecondsState(snapshot.masterOutSeconds || snapshot.videoMetadata?.durationSeconds || snapshot.project.sources.video?.durationSeconds || 60);
+    
+    const shouldBeParts = Boolean(snapshot.isMasterPatched || snapshot.timelineStage === "parts" || snapshot.project.clipSettings.mode === "manual");
+    setIsMasterPatched(shouldBeParts);
+    setTimelineStageState(shouldBeParts ? "parts" : "master");
+
     if (snapshot.workflowMode) {
       setWorkflowModeState(snapshot.workflowMode);
     }
@@ -829,9 +842,7 @@ async function restoreAutoSavedSession(): Promise<boolean> {
       setAudioAssetUrl(aUrl);
     }
 
-    if (snapshot.isMasterPatched && snapshot.timelineStage === "parts") {
-      generatePlan();
-    }
+    generatePlan();
 
     if (snapshot.currentTime !== undefined && snapshot.currentTime > 0) {
       timelineSignals.setCurrentTime(snapshot.currentTime);
@@ -854,7 +865,63 @@ async function saveAndCloseProject(onClosed?: () => void) {
   const t = timelineSignals.currentTime();
   const z = timelineSignals.zoomLevel();
   const exp = timelineSignals.isTimelineExpanded();
-  autoSave(t, z, exp);
+
+  const proj = currentProject();
+  const vMeta = videoMetadata();
+  const currentShorts = shortClips();
+  const stage = timelineStage();
+  const isPatched = isMasterPatched();
+  const mode = workflowMode();
+
+  if (proj) {
+    const snapshot: SessionSnapshot = {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      project: { ...proj, shorts: currentShorts, workflowMode: mode },
+      videoMetadata: vMeta,
+      audioMetadata: audioMetadata(),
+      masterInSeconds: masterInSeconds(),
+      masterOutSeconds: masterOutSeconds(),
+      isMasterPatched: isPatched,
+      timelineStage: stage,
+      workflowMode: mode,
+      shortClips: currentShorts,
+      activeWorkspaceTab: activeWorkspaceTab(),
+      isVideoAudioMuted: isVideoAudioMuted(),
+      isDedicatedAudioMuted: isDedicatedAudioMuted(),
+      projectFilePath: projectFilePath(),
+      currentTime: t,
+      zoomLevel: z,
+      isTimelineExpanded: exp,
+    };
+
+    const targetPath = projectFilePath() || (streamProjectDir() ? `${streamProjectDir()}/project.json` : null);
+    if (targetPath) {
+      try {
+        await saveProjectToDisk(targetPath, JSON.stringify(snapshot.project, null, 2));
+      } catch (e) {
+        console.warn("Failed saving project JSON to disk during Save & Close:", e);
+      }
+    }
+
+    saveProjectDraft({
+      id: proj.id,
+      name: proj.name,
+      filePath: targetPath || `draft_${proj.id}.json`,
+      projectDir: streamProjectDir() || undefined,
+      videoPath: proj.sources.video?.path,
+      audioPath: proj.sources.audio?.path,
+      clipsCount: currentManifest()?.clips?.length || (proj.clipSettings.mode === "manual" ? proj.clipSettings.clips.length : 0),
+      shortsCount: currentShorts.length,
+      workflowMode: mode,
+      resumeTime: t,
+      candidatesCount: 0,
+      hasChat: false,
+      status: "in_progress",
+      lastSaved: new Date().toISOString(),
+      snapshot,
+    });
+  }
 
   // Clear active workspace
   clearSessionState();
@@ -877,6 +944,139 @@ async function saveAndCloseProject(onClosed?: () => void) {
   setStatusMessage("Project saved and closed.");
   if (onClosed) {
     onClosed();
+  }
+}
+
+async function resumeDraft(draft: SavedProjectDraft): Promise<boolean> {
+  setIsLoading(true);
+  setStatusMessage(`Resuming draft: ${draft.name}...`);
+  try {
+    let snapshot = draft.snapshot;
+
+    // If disk file exists, try reading the latest content
+    if (draft.filePath && (draft.filePath.endsWith(".json") || draft.filePath.endsWith(".clipforge"))) {
+      try {
+        const content = await loadProjectFromDisk(draft.filePath);
+        if (content) {
+          const parsed = JSON.parse(content);
+          const validation = validateProjectConfig(parsed);
+          if (validation.success && validation.project) {
+            if (!snapshot) {
+              snapshot = {
+                version: 1,
+                savedAt: new Date().toISOString(),
+                project: validation.project,
+                videoMetadata: null,
+                audioMetadata: null,
+                masterInSeconds: validation.project.clipSettings.mode === "automatic" ? (validation.project.clipSettings.startSeconds || 0) : 0,
+                masterOutSeconds: validation.project.clipSettings.mode === "automatic" ? (validation.project.clipSettings.endSeconds || validation.project.sources.video.durationSeconds) : validation.project.sources.video.durationSeconds,
+                isMasterPatched: true,
+                timelineStage: "parts",
+                workflowMode: validation.project.workflowMode || draft.workflowMode || "hybrid",
+                shortClips: validation.project.shorts || [],
+                activeWorkspaceTab: "edit",
+                isVideoAudioMuted: false,
+                isDedicatedAudioMuted: false,
+                projectFilePath: draft.filePath,
+                currentTime: draft.resumeTime || 0,
+                zoomLevel: 1,
+                isTimelineExpanded: false
+              };
+            } else {
+              snapshot.project = validation.project;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Could not read draft disk file, proceeding with snapshot:", err);
+      }
+    }
+
+    if (!snapshot || !snapshot.project) {
+      throw new Error("No saved project data found for this draft.");
+    }
+
+    const proj = snapshot.project;
+    setCurrentProject(proj);
+    setProjectFilePath(snapshot.projectFilePath || (draft.filePath.endsWith(".json") ? draft.filePath : null));
+    setStreamProjectDirState(draft.projectDir || null);
+
+    // 1. Workflow Mode
+    const wMode = snapshot.workflowMode || proj.workflowMode || draft.workflowMode || "hybrid";
+    setWorkflowModeState(wMode);
+
+    // 2. Shorts
+    const restoredShorts = snapshot.shortClips || proj.shorts || [];
+    setShortClips(restoredShorts);
+
+    // 3. Video & Audio
+    if (snapshot.videoMetadata) {
+      setVideoMetadata(snapshot.videoMetadata);
+    }
+    if (proj.sources.video?.path) {
+      try {
+        const vUrl = await getMediaAssetUrl(proj.sources.video.path);
+        setVideoAssetUrl(vUrl);
+        if (!snapshot.videoMetadata) {
+          const vMeta = await inspectSource(proj.sources.video.path);
+          setVideoMetadata(vMeta);
+        }
+      } catch (e) {
+        console.warn("Failed resolving video asset URL:", e);
+      }
+    }
+
+    if (snapshot.audioMetadata) {
+      setAudioMetadata(snapshot.audioMetadata);
+    }
+    if (proj.sources.audio?.path) {
+      try {
+        const aUrl = await getMediaAssetUrl(proj.sources.audio.path);
+        setAudioAssetUrl(aUrl);
+        if (!snapshot.audioMetadata) {
+          const aMeta = await inspectSource(proj.sources.audio.path);
+          setAudioMetadata(aMeta);
+        }
+      } catch (e) {
+        console.warn("Failed resolving audio asset URL:", e);
+      }
+    }
+
+    // 4. Master Trim Range
+    const rawDur = snapshot.videoMetadata?.durationSeconds || proj.sources.video?.durationSeconds || 60;
+    setMasterInSecondsState(snapshot.masterInSeconds || 0);
+    setMasterOutSecondsState(snapshot.masterOutSeconds || rawDur);
+
+    // 5. Restore Parts Stage & Generate Plan
+    const shouldBeParts = Boolean(snapshot.isMasterPatched || snapshot.timelineStage === "parts" || (draft.clipsCount && draft.clipsCount > 0) || proj.clipSettings.mode === "manual");
+    setIsMasterPatched(shouldBeParts);
+    setTimelineStageState(shouldBeParts ? "parts" : "master");
+    generatePlan();
+
+    // 6. Tab & Playhead
+    setActiveWorkspaceTabState("edit");
+    setIsDirty(false);
+
+    const seekTime = draft.resumeTime || snapshot.currentTime || 0;
+    if (seekTime > 0) {
+      timelineSignals.setCurrentTime(seekTime);
+    }
+    if (snapshot.zoomLevel) {
+      timelineSignals.setZoomLevel(snapshot.zoomLevel);
+    }
+
+    // 7. Save this session so page refresh preserves it
+    saveSessionState(snapshot);
+
+    setStatusMessage(`Resumed project: ${proj.name}`);
+    return true;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    setValidationErrors([msg]);
+    setStatusMessage(`Error resuming draft: ${msg}`);
+    return false;
+  } finally {
+    setIsLoading(false);
   }
 }
 
@@ -1118,6 +1318,7 @@ export const projectSignals = {
   generatePlan,
   autoSave,
   restoreAutoSavedSession,
+  resumeDraft,
   createNewProject,
   updateProjectName,
   saveProject,

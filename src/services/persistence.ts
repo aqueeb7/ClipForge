@@ -21,6 +21,7 @@ export interface SavedProjectDraft {
   hasChat: boolean;
   status: "draft" | "in_progress" | "ready";
   lastSaved: string;
+  snapshot?: SessionSnapshot;
 }
 
 export function getSavedDrafts(): SavedProjectDraft[] {
