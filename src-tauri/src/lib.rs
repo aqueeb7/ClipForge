@@ -51,7 +51,7 @@ fn get_app_info() -> Result<AppDiagnostic, String> {
         ready: ffmpeg_found,
         os: std::env::consts::OS.to_string(),
         message: if ffmpeg_found {
-            format!("ClipForge engine ready ({})", gpu.as_ref().map(|g| g.name.as_str()).unwrap_or("CPU"))
+            format!("Clyptik engine ready ({})", gpu.as_ref().map(|g| g.name.as_str()).unwrap_or("CPU"))
         } else {
             "FFmpeg not found in PATH".to_string()
         },
@@ -395,5 +395,5 @@ pub fn run() {
             cleanup_incomplete_files
         ])
         .run(tauri::generate_context!())
-        .expect("error while running ClipForge application");
+        .expect("error while running Clyptik application");
 }

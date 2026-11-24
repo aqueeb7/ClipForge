@@ -1,8 +1,8 @@
 [package]
 name = "clipforge"
 version = "0.1.0"
-description = "ClipForge Desktop Engine"
-authors = ["ClipForge Team"]
+description = "Clyptik Desktop Engine"
+authors = ["Clyptik Team"]
 edition = "2021"
 
 [lib]

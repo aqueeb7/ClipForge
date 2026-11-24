@@ -1069,7 +1069,7 @@ pub fn export_highlight_candidate_internal(
         crf: Some(18),
         preset: Some("fast".to_string()),
         overlay_enabled: Some(true),
-        brand_title: Some("CLIPFORGE".to_string()),
+        brand_title: Some("CLYPTIK".to_string()),
         episode_label: Some(format!("#{:02}", candidate.rank)),
         episode_index: Some(candidate.rank as u32),
         ..Default::default()

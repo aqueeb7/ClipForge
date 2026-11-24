@@ -149,7 +149,7 @@ async function loadVideoSource(filePath: string, customAssetUrl?: string) {
 
     let proj = currentProject();
     if (!proj) {
-      const baseName = filePath.split(/[/\\]/).pop()?.replace(/\.[^/.]+$/, "") || "clipforge-project";
+      const baseName = filePath.split(/[/\\]/).pop()?.replace(/\.[^/.]+$/, "") || "clyptik-project";
       proj = initProject({
         id: `proj_${Date.now()}`,
         name: baseName,
@@ -567,7 +567,7 @@ function addShortClip(start: number, end: number, options?: Partial<ShortClipIte
     duration: dur,
     framingTemplate: template,
     stacking,
-    headerTitle: options?.headerTitle || currentProject()?.composition?.overlay?.brandTitle || "CLIPFORGE",
+    headerTitle: options?.headerTitle || currentProject()?.composition?.overlay?.brandTitle || "CLYPTIK",
     brandTitle: options?.brandTitle || "#Shorts",
     source: options?.source || "manual",
     confidence: options?.confidence,
@@ -972,7 +972,7 @@ async function resumeDraft(draft: SavedProjectDraft): Promise<boolean> {
     let snapshot = draft.snapshot;
 
     // If disk file exists, try reading the latest content
-    if (draft.filePath && (draft.filePath.endsWith(".json") || draft.filePath.endsWith(".clipforge"))) {
+    if (draft.filePath && (draft.filePath.endsWith(".json") || draft.filePath.endsWith(".clyptik") || draft.filePath.endsWith(".clipforge"))) {
       try {
         const content = await loadProjectFromDisk(draft.filePath);
         if (content) {
@@ -1162,11 +1162,11 @@ async function saveProjectAs(): Promise<boolean> {
     return false;
   }
 
-  const defaultName = `${proj.name || "project"}.clipforge`;
+  const defaultName = `${proj.name || "project"}.clyptik`;
   const selected = await saveFileDialog({
-    title: "Save ClipForge Project",
+    title: "Save Clyptik Project",
     defaultPath: defaultName,
-    filters: [{ name: "ClipForge Project (*.clipforge)", extensions: ["clipforge", "json"] }]
+    filters: [{ name: "Clyptik Project (*.clyptik, *.clipforge, *.json)", extensions: ["clyptik", "clipforge", "json"] }]
   });
 
   if (!selected) return false;
@@ -1177,8 +1177,8 @@ async function openProject(filePath?: string): Promise<boolean> {
   let targetPath = filePath;
   if (!targetPath) {
     const selected = await openFileDialog({
-      title: "Open ClipForge Project",
-      filters: [{ name: "ClipForge Project (*.clipforge, *.json)", extensions: ["clipforge", "json"] }]
+      title: "Open Clyptik Project",
+      filters: [{ name: "Clyptik Project (*.clyptik, *.clipforge, *.json)", extensions: ["clyptik", "clipforge", "json"] }]
     });
     if (!selected) return false;
     targetPath = selected;

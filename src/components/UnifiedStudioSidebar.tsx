@@ -479,7 +479,7 @@ export const UnifiedStudioSidebar: Component<UnifiedStudioSidebarProps> = (props
                       onChange={(e) =>
                         projectSignals.updateComposition({
                           overlay: {
-                            ...(composition()?.overlay || { brandTitle: "CLIPFORGE", episodeLabel: "PART" }),
+                            ...(composition()?.overlay || { brandTitle: "CLYPTIK", episodeLabel: "PART" }),
                             enabled: (e.target as HTMLInputElement).checked
                           }
                         })
@@ -494,7 +494,7 @@ export const UnifiedStudioSidebar: Component<UnifiedStudioSidebarProps> = (props
                         <span class="text-[10px] text-zinc-400 block mb-1">Header Brand Title</span>
                         <input
                           type="text"
-                          value={composition()?.overlay?.brandTitle || "CLIPFORGE"}
+                          value={composition()?.overlay?.brandTitle || "CLYPTIK"}
                           onInput={(e) =>
                             projectSignals.updateComposition({
                               overlay: {
@@ -514,7 +514,7 @@ export const UnifiedStudioSidebar: Component<UnifiedStudioSidebarProps> = (props
                           onInput={(e) =>
                             projectSignals.updateComposition({
                               overlay: {
-                                ...(composition()?.overlay || { enabled: true, brandTitle: "CLIPFORGE" }),
+                                ...(composition()?.overlay || { enabled: true, brandTitle: "CLYPTIK" }),
                                 episodeLabel: (e.target as HTMLInputElement).value
                               }
                             })

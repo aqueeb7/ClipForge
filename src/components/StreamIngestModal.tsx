@@ -196,7 +196,7 @@ export const StreamIngestModal: Component<StreamIngestModalProps> = (props) => {
                 <h2 class="text-sm font-semibold text-zinc-100 flex items-center gap-2">
                   <span>Stream Intelligence Ingest</span>
                   <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950 text-blue-400 border border-blue-800">
-                    ClipForge 2.0
+                    Clyptik 2.0
                   </span>
                 </h2>
                 <p class="text-xs text-zinc-400">

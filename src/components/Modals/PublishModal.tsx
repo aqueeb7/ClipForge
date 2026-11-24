@@ -53,11 +53,11 @@ export const PublishModal: Component<PublishModalProps> = (props) => {
   // Form Fields
   const [title, setTitle] = createSignal("");
   const [description, setDescription] = createSignal("");
-  const [tags, setTags] = createSignal<string[]>(["#Shorts", "#Gaming", "#ClipForge"]);
+  const [tags, setTags] = createSignal<string[]>(["#Shorts", "#Gaming", "#Clyptik"]);
   const [newTagInput, setNewTagInput] = createSignal("");
   const [privacy, setPrivacy] = createSignal<"public" | "unlisted" | "private">("public");
 
-  // OAuth Config Inputs for ClipForge
+  // OAuth Config Inputs for Clyptik
   const [clientId, setClientId] = createSignal("");
   const [clientSecret, setClientSecret] = createSignal("");
   const [isAuthenticating, setIsAuthenticating] = createSignal(false);
@@ -96,8 +96,8 @@ From exploring the streets to unexpected chaos, missions, driving and pure open-
 • Quality: 2K / 1440p 60FPS
 • Content: Gameplay, exploration & open-world action
 
-🛠️ Built for Gamers — ClipForge:
-I'm also building ClipForge, a high-performance open-source desktop tool designed to turn long gameplay sessions into vertical short-form clips. Powered natively by Rust and FFmpeg hardware acceleration.
+🛠️ Built for Gamers — Clyptik:
+I'm also building Clyptik, a high-performance open-source desktop tool designed to turn long gameplay sessions into vertical short-form clips. Powered natively by Rust and FFmpeg hardware acceleration.
 ⭐ GitHub: github.com/aqueeb7/ClipForge
 
 If you're into gaming, game dev, and open-source projects, consider following along!
@@ -112,7 +112,7 @@ Like, share and subscribe for more Vice City action.`,
       "#Gaming",
       "#2KGaming",
       "#1440pGaming",
-      "#ClipForge",
+      "#Clyptik",
       "#OpenSource",
       "#Shorts",
     ],
@@ -129,9 +129,9 @@ Like, share and subscribe for more Vice City action.`,
       const clipTitle = props.clip?.outputName || `Part #${(props.clip?.index ?? 0) + 1}`;
       setTitle(`${clipTitle} - ${projName} #Shorts`);
       setDescription(
-        `High-performance vertical clip extracted from ${projName}.\n\nRendered locally with ClipForge Engine (https://github.com/aqueeb7/ClipForge).`
+        `High-performance vertical clip extracted from ${projName}.\n\nRendered locally with Clyptik Engine (https://github.com/aqueeb7/ClipForge).`
       );
-      setTags(["#Shorts", "#Gaming", "#ClipForge", `#${projName.replace(/\s+/g, "")}`]);
+      setTags(["#Shorts", "#Gaming", "#Clyptik", `#${projName.replace(/\s+/g, "")}`]);
     }
   }
 
@@ -599,7 +599,7 @@ Like, share and subscribe for more Vice City action.`,
                     <div class="flex items-center justify-between pb-1.5 border-b border-zinc-800">
                       <span class="font-semibold text-blue-400 flex items-center gap-1.5">
                         <HelpCircle size={13} />
-                        How to Configure Google Cloud Console for ClipForge
+                        How to Configure Google Cloud Console for Clyptik
                       </span>
                       <button
                         type="button"
@@ -630,7 +630,7 @@ Like, share and subscribe for more Vice City action.`,
                         Under <strong>Credentials</strong> &gt; <strong>Create Credentials</strong> &gt; <strong>OAuth client ID</strong>:
                         <ul class="list-disc list-inside ml-4 text-zinc-400 mt-0.5 space-y-0.5">
                           <li>Application type: <strong>Desktop app</strong> (recommended) or <strong>Web application</strong></li>
-                          <li>Name: <code>ClipForge</code></li>
+                          <li>Name: <code>Clyptik</code></li>
                           <li>
                             Authorized redirect URI: <code class="bg-zinc-800 text-emerald-400 px-1 py-0.5 rounded font-mono">http://localhost:8085</code> (or <code class="bg-zinc-800 text-emerald-400 px-1 py-0.5 rounded font-mono">http://localhost</code>)
                           </li>
@@ -770,9 +770,9 @@ Like, share and subscribe for more Vice City action.`,
                       type="button"
                       onClick={() => applyTemplate("gta6")}
                       class="px-2 py-0.5 rounded text-[11px] font-medium bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 border border-amber-800/50 transition cursor-pointer flex items-center gap-1 shadow-sm"
-                      title="Load GTA 6 Vice City 2K + ClipForge promo template"
+                      title="Load GTA 6 Vice City 2K + Clyptik promo template"
                     >
-                      <span>🌴 GTA 6 + ClipForge</span>
+                      <span>🌴 GTA 6 + Clyptik</span>
                     </button>
                     <button
                       type="button"
@@ -968,7 +968,7 @@ Like, share and subscribe for more Vice City action.`,
                       </h3>
                       <p class="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
                         Instagram and TikTok support desktop uploading directly from the web browser.
-                        ClipForge automates the tedious steps: copy captions, highlight the file in Explorer,
+                        Clyptik automates the tedious steps: copy captions, highlight the file in Explorer,
                         and launch the upload page.
                       </p>
                     </div>

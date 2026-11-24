@@ -1,9 +1,9 @@
 {
-  "name": "clipforge",
+  "name": "clyptik",
   "version": "0.1.0",
   "description": "Local-first video production engine for converting long-form gameplay into vertical clips",
   "private": true,
-  "author": "ClipForge Team",
+  "author": "Clyptik Team",
   "license": "MIT",
   "type": "module",
   "workspaces": [

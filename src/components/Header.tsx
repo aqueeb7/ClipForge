@@ -26,10 +26,10 @@ export const Header: Component<HeaderProps> = (props) => {
       <div class="flex items-center gap-3">
         <div class="flex items-center gap-2">
           <div class="w-6 h-6 rounded bg-blue-600 flex items-center justify-center font-black text-xs text-white tracking-wider">
-            CF
+            CK
           </div>
           <span class="text-xs font-bold tracking-wider text-zinc-100 uppercase">
-            ClipForge
+            Clyptik
           </span>
         </div>
 

@@ -241,7 +241,7 @@ export async function runExportQueue(project: ClipForgeProject) {
           crf: project.export.crf,
           preset: project.export.preset,
           overlay_enabled: overlayEnabled,
-          brand_title: isShort ? undefined : (project.composition.overlay?.brandTitle || "CLIPFORGE"),
+          brand_title: isShort ? undefined : (project.composition.overlay?.brandTitle || "CLYPTIK"),
           episode_label: isShort ? undefined : (project.composition.overlay?.episodeLabel || "PART"),
           episode_index: isShort ? undefined : item.episodeIndex
         });
@@ -361,7 +361,7 @@ export async function renderSingleClip(clip: Clip, project: ClipForgeProject) {
       crf: project.export.crf,
       preset: project.export.preset,
       overlay_enabled: overlayEnabled,
-      brand_title: isShort ? undefined : (project.composition.overlay?.brandTitle || "CLIPFORGE"),
+      brand_title: isShort ? undefined : (project.composition.overlay?.brandTitle || "CLYPTIK"),
       episode_label: isShort ? undefined : (project.composition.overlay?.episodeLabel || "PART"),
       episode_index: isShort ? undefined : item.episodeIndex
     });

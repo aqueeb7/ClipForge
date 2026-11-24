@@ -983,7 +983,7 @@ export const TimelineScrubber: Component = () => {
                   width: `${Math.max(1, masterOutPercent() - masterInPercent())}%`,
                 }}
               >
-                <span class="truncate">🏷️ {composition()?.overlay?.brandTitle || "CLIPFORGE"} • {composition()?.overlay?.episodeLabel || "PART"} #Shorts</span>
+                <span class="truncate">🏷️ {composition()?.overlay?.brandTitle || "CLYPTIK"} • {composition()?.overlay?.episodeLabel || "PART"} #Shorts</span>
               </div>
             </Show>
           </div>

@@ -76,7 +76,7 @@ export function createDefaultProject(options: CreateProjectOptions): ClipForgePr
       },
       overlay: {
         enabled: true,
-        brandTitle: "CLIPFORGE",
+        brandTitle: "CLYPTIK",
         episodeLabel: "PART",
         showEpisodeNumber: true
       }

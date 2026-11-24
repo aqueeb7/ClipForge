@@ -87,7 +87,7 @@ export async function checkEnvironment(): Promise<EnvironmentInfo> {
   return {
     ready: true,
     os: "browser-dev",
-    message: "ClipForge Web Dev Mode (Simulated)",
+    message: "Clyptik Web Dev Mode (Simulated)",
     ffmpegFound: true,
     ffprobeFound: true,
     gpu: {
@@ -268,9 +268,9 @@ export async function saveFileDialog(options?: {
       const { save } = await import("@tauri-apps/plugin-dialog");
       const selected = await save({
         title: options?.title ?? "Save Project",
-        defaultPath: options?.defaultPath ?? "project.clipforge",
+        defaultPath: options?.defaultPath ?? "project.clyptik",
         filters: options?.filters ?? [
-          { name: "ClipForge Project (*.clipforge)", extensions: ["clipforge", "json"] }
+          { name: "Clyptik Project (*.clyptik, *.clipforge, *.json)", extensions: ["clyptik", "clipforge", "json"] }
         ]
       });
       if (typeof selected === "string") return selected;

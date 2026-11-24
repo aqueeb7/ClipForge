@@ -480,7 +480,7 @@ export const Inspector: Component = () => {
                     <span class="block text-[10px] text-zinc-400 mb-1">Top Brand Badge</span>
                     <input
                       type="text"
-                      placeholder="e.g. CLIPFORGE"
+                      placeholder="e.g. CLYPTIK"
                       value={composition()?.overlay?.brandTitle || ""}
                       onInput={(e) => {
                         projectSignals.updateComposition({

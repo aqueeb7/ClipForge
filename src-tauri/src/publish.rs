@@ -337,7 +337,7 @@ pub fn listen_for_oauth_code_internal(port: u16) -> Result<String, String> {
 <html>
 <head>
   <meta charset="utf-8">
-  <title>ClipForge • Connected to YouTube</title>
+  <title>Clyptik • Connected to YouTube</title>
   <style>
     body { background-color: #090d16; color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
     .card { background-color: #111827; border: 1px solid #1f2937; border-radius: 16px; padding: 40px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); max-width: 440px; }
@@ -351,8 +351,8 @@ pub fn listen_for_oauth_code_internal(port: u16) -> Result<String, String> {
   <div class="card">
     <div class="icon">&#10003;</div>
     <h1>Authorization Successful</h1>
-    <p>ClipForge has connected to your YouTube account. You can now close this tab and return to ClipForge.</p>
-    <div class="badge">ClipForge Studio Engine</div>
+    <p>Clyptik has connected to your YouTube account. You can now close this tab and return to Clyptik.</p>
+    <div class="badge">Clyptik Studio Engine</div>
   </div>
 </body>
 </html>"#
@@ -361,7 +361,7 @@ pub fn listen_for_oauth_code_internal(port: u16) -> Result<String, String> {
 <html>
 <head>
   <meta charset="utf-8">
-  <title>ClipForge • Authorization Failed</title>
+  <title>Clyptik • Authorization Failed</title>
   <style>
     body { background-color: #090d16; color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
     .card { background-color: #111827; border: 1px solid #ef4444; border-radius: 16px; padding: 40px; text-align: center; max-width: 440px; }
@@ -374,7 +374,7 @@ pub fn listen_for_oauth_code_internal(port: u16) -> Result<String, String> {
   <div class="card">
     <div class="icon">&#10005;</div>
     <h1>Authorization Failed</h1>
-    <p>Google authorization was not completed. Please return to ClipForge and try again.</p>
+    <p>Google authorization was not completed. Please return to Clyptik and try again.</p>
   </div>
 </body>
 </html>"#

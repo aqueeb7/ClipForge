@@ -55,7 +55,7 @@ export const CompositionSettingsSchema = z.object({
 
   overlay: z.object({
     enabled: z.boolean().default(true),
-    brandTitle: z.string().default("CLIPFORGE"),
+    brandTitle: z.string().default("CLYPTIK"),
     episodeLabel: z.string().default("PART"),
     showEpisodeNumber: z.boolean().default(true)
   }).default({

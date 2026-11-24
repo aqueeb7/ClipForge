@@ -281,7 +281,7 @@ export function createDefaultProject(options: {
       },
       overlay: {
         enabled: true,
-        brandTitle: "CLIPFORGE",
+        brandTitle: "CLYPTIK",
         episodeLabel: "PART",
         showEpisodeNumber: true
       }
