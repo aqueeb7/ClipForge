@@ -75,7 +75,7 @@ export const UnifiedStudioSidebar: Component<UnifiedStudioSidebarProps> = (props
   return (
     <aside
       class={`h-full shrink-0 select-none transition-all duration-200 flex flex-col ${
-        isCollapsed() ? "w-11" : "w-[425px]"
+        isCollapsed() ? "w-11" : "w-[430px]"
       }`}
     >
       <div class="h-full w-full bg-zinc-950 border border-zinc-800/80 rounded-xl flex flex-col overflow-hidden shadow-2xl">
@@ -157,13 +157,13 @@ export const UnifiedStudioSidebar: Component<UnifiedStudioSidebarProps> = (props
           }
         >
           {/* ===================== EXPANDED HEADER & TABS ===================== */}
-          <div class="h-10 border-b border-zinc-800/80 bg-zinc-900/70 flex items-center justify-between px-2 gap-1 shrink-0">
+          <div class="h-10 border-b border-zinc-800/80 bg-zinc-900/70 flex items-center justify-between px-2 gap-1 shrink-0 overflow-x-auto no-scrollbar">
             {/* 4 Primary Navigation Tabs */}
             <div class="flex items-center gap-1 flex-1 min-w-0">
               <button
                 type="button"
                 onClick={() => setActiveTab("framing")}
-                class={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                class={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                   activeTab() === "framing"
                     ? "bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/50"
                     : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40"
@@ -177,7 +177,7 @@ export const UnifiedStudioSidebar: Component<UnifiedStudioSidebarProps> = (props
               <button
                 type="button"
                 onClick={() => setActiveTab("clips")}
-                class={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                class={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                   activeTab() === "clips"
                     ? "bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/50"
                     : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40"
@@ -196,7 +196,7 @@ export const UnifiedStudioSidebar: Component<UnifiedStudioSidebarProps> = (props
               <button
                 type="button"
                 onClick={() => setActiveTab("intelligence")}
-                class={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                class={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                   activeTab() === "intelligence"
                     ? "bg-zinc-800 text-amber-300 shadow-sm border border-zinc-700/50"
                     : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40"
@@ -210,7 +210,7 @@ export const UnifiedStudioSidebar: Component<UnifiedStudioSidebarProps> = (props
               <button
                 type="button"
                 onClick={() => setActiveTab("audio")}
-                class={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                class={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                   activeTab() === "audio"
                     ? "bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/50"
                     : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40"

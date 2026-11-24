@@ -186,11 +186,11 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
         {/* Tier 2: Filter Pills & Batch Action Toolbar */}
         <div class="flex items-center justify-between gap-2 text-xs">
           {/* Filter Pills */}
-          <div class="flex items-center gap-0.5 bg-zinc-950 p-0.5 rounded-md border border-zinc-800 text-[10px]">
+          <div class="flex items-center gap-0.5 bg-zinc-950 p-0.5 rounded-md border border-zinc-800 text-[10px] shrink-0">
             <button
               type="button"
               onClick={() => setFilter("all")}
-              class={`px-2 py-0.5 rounded transition cursor-pointer font-medium ${
+              class={`px-2 py-0.5 rounded transition cursor-pointer font-medium whitespace-nowrap ${
                 filter() === "all"
                   ? "bg-zinc-800 text-zinc-100 font-semibold"
                   : "text-zinc-500 hover:text-zinc-300"
@@ -201,7 +201,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
             <button
               type="button"
               onClick={() => setFilter("ready")}
-              class={`px-2 py-0.5 rounded transition cursor-pointer flex items-center gap-1 ${
+              class={`px-2 py-0.5 rounded transition cursor-pointer flex items-center gap-1 whitespace-nowrap ${
                 filter() === "ready"
                   ? "bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 font-semibold"
                   : "text-zinc-500 hover:text-zinc-300"
@@ -215,7 +215,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
             <button
               type="button"
               onClick={() => setFilter("queued")}
-              class={`px-2 py-0.5 rounded transition cursor-pointer flex items-center gap-1 ${
+              class={`px-2 py-0.5 rounded transition cursor-pointer flex items-center gap-1 whitespace-nowrap ${
                 filter() === "queued"
                   ? "bg-zinc-800 text-zinc-200 font-semibold"
                   : "text-zinc-500 hover:text-zinc-300"
@@ -238,7 +238,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                     const targetClip = clips().find((c) => queueSignals.isClipRendered(c.id)) || clips()[0];
                     if (targetClip) props.onPublishClip?.(targetClip);
                   }}
-                  class="px-2 py-1 bg-blue-950/60 hover:bg-blue-900/80 text-blue-300 rounded text-[11px] font-medium cursor-pointer transition flex items-center gap-1 border border-blue-800/60"
+                  class="px-2 py-1 bg-blue-950/60 hover:bg-blue-900/80 text-blue-300 rounded text-[11px] font-medium cursor-pointer transition flex items-center gap-1 border border-blue-800/60 whitespace-nowrap shrink-0"
                   title="Open Publishing Hub for rendered parts"
                 >
                   <Share size={11} />
@@ -253,7 +253,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                     type="button"
                     onClick={handleStartExport}
                     disabled={queueSignals.isExporting() || clips().length === 0}
-                    class="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded text-[11px] font-semibold cursor-pointer transition flex items-center gap-1 shadow-sm"
+                    class="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded text-[11px] font-semibold cursor-pointer transition flex items-center gap-1 shadow-sm whitespace-nowrap shrink-0"
                   >
                     <Download size={11} />
                     <span>{queueSignals.isExporting() ? "Rendering..." : "Render All"}</span>
@@ -264,7 +264,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                   type="button"
                   onClick={handleExportRemaining}
                   disabled={queueSignals.isExporting()}
-                  class="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded text-[11px] font-semibold cursor-pointer transition flex items-center gap-1 shadow-sm"
+                  class="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded text-[11px] font-semibold cursor-pointer transition flex items-center gap-1 shadow-sm whitespace-nowrap shrink-0"
                   title="Render remaining unrendered clips in background"
                 >
                   <Download size={11} />
@@ -277,7 +277,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
               <button
                 type="button"
                 onClick={handleAddQuickShort}
-                class="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded text-[11px] font-semibold cursor-pointer transition flex items-center gap-1 shadow-sm"
+                class="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded text-[11px] font-semibold cursor-pointer transition flex items-center gap-1 shadow-sm whitespace-nowrap shrink-0"
                 title="Create custom vertical short from marked range or playhead"
               >
                 <Plus size={11} />
@@ -294,7 +294,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                       props.onPublishClip?.(shortToClip(rendered, idx));
                     }
                   }}
-                  class="px-2 py-1 bg-blue-950/60 hover:bg-blue-900/80 text-blue-300 rounded text-[11px] font-medium cursor-pointer transition flex items-center gap-1 border border-blue-800/60"
+                  class="px-2 py-1 bg-blue-950/60 hover:bg-blue-900/80 text-blue-300 rounded text-[11px] font-medium cursor-pointer transition flex items-center gap-1 border border-blue-800/60 whitespace-nowrap shrink-0"
                   title="Open Publishing Hub for rendered shorts"
                 >
                   <Share size={11} />
@@ -380,11 +380,11 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                             <Play size={10} />
                           </button>
 
-                          <span class="font-bold text-amber-200 text-xs shrink-0 truncate max-w-[140px]">
+                          <span class="font-bold text-amber-200 text-xs shrink-0 truncate max-w-[140px] whitespace-nowrap">
                             {short.title || `Short #${idx() + 1}`}
                           </span>
 
-                          <span class="text-[11px] font-mono text-zinc-400 tabular-nums truncate">
+                          <span class="text-[11px] font-mono text-zinc-400 tabular-nums truncate whitespace-nowrap">
                             {formatTime(short.start)} → {formatTime(short.end)}
                             <span class="text-zinc-500 ml-1">({durationSec.toFixed(1)}s)</span>
                           </span>
@@ -551,11 +551,11 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                           <Play size={10} />
                         </button>
 
-                        <span class="font-bold text-zinc-100 text-xs shrink-0">
+                        <span class="font-bold text-zinc-100 text-xs shrink-0 whitespace-nowrap">
                           {clip.title}
                         </span>
 
-                        <span class="text-[11px] font-mono text-zinc-400 tabular-nums truncate">
+                        <span class="text-[11px] font-mono text-zinc-400 tabular-nums truncate whitespace-nowrap">
                           {formatTime(clip.sourceStartSeconds)} → {formatTime(clip.sourceEndSeconds)}
                           <span class="text-zinc-500 ml-1">({durationSec.toFixed(1)}s)</span>
                         </span>
