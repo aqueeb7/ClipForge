@@ -11,7 +11,6 @@ import {
   ExternalLink,
   RefreshCw,
   CheckCircle2,
-  AlertCircle,
   Share,
   YouTubeIcon,
   InstagramIcon,
@@ -35,6 +34,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
   const [activeTab, setActiveTab] = createSignal<"parts" | "shorts">(
     projectSignals.workflowMode() === "shorts" ? "shorts" : "parts"
   );
+  const [filter, setFilter] = createSignal<"all" | "ready" | "queued">("all");
 
   const renderedCount = createMemo(
     () => clips().filter((c) => queueSignals.isClipRendered(c.id)).length
@@ -44,6 +44,21 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
   const renderedShortsCount = createMemo(
     () => shortClips().filter((s) => queueSignals.isClipRendered(s.id)).length
   );
+  const unrenderedShortsCount = createMemo(() => shortClips().length - renderedShortsCount());
+
+  const filteredClips = createMemo(() => {
+    const list = clips();
+    if (filter() === "ready") return list.filter((c) => queueSignals.isClipRendered(c.id));
+    if (filter() === "queued") return list.filter((c) => !queueSignals.isClipRendered(c.id));
+    return list;
+  });
+
+  const filteredShorts = createMemo(() => {
+    const list = shortClips();
+    if (filter() === "ready") return list.filter((s) => queueSignals.isClipRendered(s.id));
+    if (filter() === "queued") return list.filter((s) => !queueSignals.isClipRendered(s.id));
+    return list;
+  });
 
   function formatTime(seconds: number): string {
     const mins = Math.floor(seconds / 60);
@@ -130,59 +145,142 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
   }
 
   return (
-    <div class="rounded-xl border border-zinc-800/80 bg-zinc-950 flex flex-col h-full overflow-hidden select-none">
-      {/* Header Bar */}
-      <div class="px-4 py-2 border-b border-zinc-800/80 bg-zinc-900/60 flex items-center justify-between shrink-0 gap-3">
-        {/* Left: Tab Switcher (Stream Parts vs Vertical Shorts) */}
-        <div class="flex items-center gap-2">
-          <div class="flex items-center bg-zinc-950 p-0.5 rounded-lg border border-zinc-800">
+    <div class="flex flex-col h-full overflow-hidden select-none bg-zinc-950">
+      {/* ===================== CONTROL HEADER HUB ===================== */}
+      <div class="p-2.5 pb-2 border-b border-zinc-800/80 bg-zinc-900/60 flex flex-col gap-2 shrink-0">
+        {/* Tier 1: Mode Switcher (50 / 50 Balanced Grid) */}
+        <div class="grid grid-cols-2 p-0.5 rounded-lg bg-zinc-950 border border-zinc-800 text-xs">
+          <button
+            type="button"
+            onClick={() => setActiveTab("parts")}
+            class={`py-1.5 px-3 rounded-md transition cursor-pointer flex items-center justify-center gap-1.5 ${
+              activeTab() === "parts"
+                ? "bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/60 font-semibold"
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <Scissors size={12} class="text-blue-400" />
+            <span>Stream Parts</span>
+            <span class="px-1.5 py-0.2 rounded text-[10px] font-mono tabular-nums bg-zinc-900 border border-zinc-800 text-zinc-300">
+              {clips().length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("shorts")}
+            class={`py-1.5 px-3 rounded-md transition cursor-pointer flex items-center justify-center gap-1.5 ${
+              activeTab() === "shorts"
+                ? "bg-amber-950/70 text-amber-200 shadow-sm border border-amber-800/60 font-semibold"
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <Film size={12} class="text-amber-400" />
+            <span>9:16 Shorts</span>
+            <span class="px-1.5 py-0.2 rounded text-[10px] font-mono tabular-nums bg-amber-950 border border-amber-800/50 text-amber-300">
+              {shortClips().length}
+            </span>
+          </button>
+        </div>
+
+        {/* Tier 2: Filter Pills & Batch Action Toolbar */}
+        <div class="flex items-center justify-between gap-2 text-xs">
+          {/* Filter Pills */}
+          <div class="flex items-center gap-0.5 bg-zinc-950 p-0.5 rounded-md border border-zinc-800 text-[10px]">
             <button
               type="button"
-              onClick={() => setActiveTab("parts")}
-              class={`px-2.5 py-1 rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
-                activeTab() === "parts"
-                  ? "bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/50"
-                  : "text-zinc-400 hover:text-zinc-200"
+              onClick={() => setFilter("all")}
+              class={`px-2 py-0.5 rounded transition cursor-pointer font-medium ${
+                filter() === "all"
+                  ? "bg-zinc-800 text-zinc-100 font-semibold"
+                  : "text-zinc-500 hover:text-zinc-300"
               }`}
             >
-              <Scissors size={12} class="text-blue-400" />
-              <span>Stream Parts</span>
-              <span class="px-1.5 py-0.2 rounded text-[10px] font-mono tabular-nums bg-zinc-900 border border-zinc-800 text-zinc-300">
-                {clips().length}
+              All
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilter("ready")}
+              class={`px-2 py-0.5 rounded transition cursor-pointer flex items-center gap-1 ${
+                filter() === "ready"
+                  ? "bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 font-semibold"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              <span>Ready</span>
+              <span class="font-mono tabular-nums font-bold">
+                {activeTab() === "parts" ? renderedCount() : renderedShortsCount()}
               </span>
             </button>
-
             <button
               type="button"
-              onClick={() => setActiveTab("shorts")}
-              class={`px-2.5 py-1 rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
-                activeTab() === "shorts"
-                  ? "bg-amber-950/60 text-amber-200 shadow-sm border border-amber-800/60"
-                  : "text-zinc-400 hover:text-zinc-200"
+              onClick={() => setFilter("queued")}
+              class={`px-2 py-0.5 rounded transition cursor-pointer flex items-center gap-1 ${
+                filter() === "queued"
+                  ? "bg-zinc-800 text-zinc-200 font-semibold"
+                  : "text-zinc-500 hover:text-zinc-300"
               }`}
             >
-              <Film size={12} class="text-amber-400" />
-              <span>9:16 Shorts</span>
-              <span class="px-1.5 py-0.2 rounded text-[10px] font-mono tabular-nums bg-amber-950/80 border border-amber-800/50 text-amber-300">
-                {shortClips().length}
+              <span>Queued</span>
+              <span class="font-mono tabular-nums">
+                {activeTab() === "parts" ? unrenderedCount() : unrenderedShortsCount()}
               </span>
             </button>
           </div>
-        </div>
 
-        {/* Right: Controls based on active tab */}
-        <Show
-          when={activeTab() === "parts"}
-          fallback={
-            /* Shorts Controls */
-            <div class="flex items-center gap-1.5">
+          {/* Action Buttons */}
+          <div class="flex items-center gap-1.5 shrink-0">
+            <Show when={activeTab() === "parts"}>
+              <Show when={renderedCount() > 0}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const targetClip = clips().find((c) => queueSignals.isClipRendered(c.id)) || clips()[0];
+                    if (targetClip) props.onPublishClip?.(targetClip);
+                  }}
+                  class="px-2 py-1 bg-blue-950/60 hover:bg-blue-900/80 text-blue-300 rounded text-[11px] font-medium cursor-pointer transition flex items-center gap-1 border border-blue-800/60"
+                  title="Open Publishing Hub for rendered parts"
+                >
+                  <Share size={11} />
+                  <span>Publish Hub</span>
+                </button>
+              </Show>
+
+              <Show
+                when={unrenderedCount() > 0 && renderedCount() > 0}
+                fallback={
+                  <button
+                    type="button"
+                    onClick={handleStartExport}
+                    disabled={queueSignals.isExporting() || clips().length === 0}
+                    class="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded text-[11px] font-semibold cursor-pointer transition flex items-center gap-1 shadow-sm"
+                  >
+                    <Download size={11} />
+                    <span>{queueSignals.isExporting() ? "Rendering..." : "Render All"}</span>
+                  </button>
+                }
+              >
+                <button
+                  type="button"
+                  onClick={handleExportRemaining}
+                  disabled={queueSignals.isExporting()}
+                  class="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded text-[11px] font-semibold cursor-pointer transition flex items-center gap-1 shadow-sm"
+                  title="Render remaining unrendered clips in background"
+                >
+                  <Download size={11} />
+                  <span>{queueSignals.isExporting() ? "Rendering..." : `Render (${unrenderedCount()})`}</span>
+                </button>
+              </Show>
+            </Show>
+
+            <Show when={activeTab() === "shorts"}>
               <button
                 type="button"
                 onClick={handleAddQuickShort}
-                class="px-2.5 py-1 bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 rounded text-xs font-medium cursor-pointer transition flex items-center gap-1.5 border border-amber-800/60 shadow-sm"
-                title="Create custom short (uses timeline In/Out markers if set)"
+                class="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded text-[11px] font-semibold cursor-pointer transition flex items-center gap-1 shadow-sm"
+                title="Create custom vertical short from marked range or playhead"
               >
-                <Plus size={12} class="text-amber-400" />
+                <Plus size={11} />
                 <span>+ Create Short</span>
               </button>
 
@@ -196,79 +294,41 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                       props.onPublishClip?.(shortToClip(rendered, idx));
                     }
                   }}
-                  class="px-2.5 py-1 bg-blue-950/60 hover:bg-blue-900/80 text-blue-300 rounded text-xs font-medium cursor-pointer transition flex items-center gap-1.5 border border-blue-800/60 shadow-sm"
+                  class="px-2 py-1 bg-blue-950/60 hover:bg-blue-900/80 text-blue-300 rounded text-[11px] font-medium cursor-pointer transition flex items-center gap-1 border border-blue-800/60"
                   title="Open Publishing Hub for rendered shorts"
                 >
-                  <Share size={12} />
+                  <Share size={11} />
                   <span>Publish Hub</span>
                 </button>
               </Show>
-            </div>
-          }
-        >
-          {/* Episodic Parts Global Batch Render Controls */}
-          <Show when={clips().length > 0}>
-            <div class="flex items-center gap-1.5">
-              <Show when={renderedCount() > 0}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const targetClip = clips().find((c) => queueSignals.isClipRendered(c.id)) || clips()[0];
-                    if (targetClip) props.onPublishClip?.(targetClip);
-                  }}
-                  class="px-2.5 py-1 bg-blue-950/60 hover:bg-blue-900/80 text-blue-300 rounded text-xs font-medium cursor-pointer transition flex items-center gap-1.5 border border-blue-800/60 shadow-sm"
-                  title="Open Publishing Hub for rendered clips"
-                >
-                  <Share size={12} />
-                  <span>Publish Hub</span>
-                </button>
-              </Show>
-
-              <Show when={unrenderedCount() > 0 && renderedCount() > 0}>
-                <button
-                  type="button"
-                  onClick={handleExportRemaining}
-                  disabled={queueSignals.isExporting()}
-                  class="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded text-xs font-medium cursor-pointer transition flex items-center gap-1.5 border border-zinc-700"
-                >
-                  <Download size={12} />
-                  <span>Render Remaining ({unrenderedCount()})</span>
-                </button>
-              </Show>
-
-              <button
-                type="button"
-                onClick={handleStartExport}
-                disabled={queueSignals.isExporting()}
-                class="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded text-xs font-semibold cursor-pointer transition flex items-center gap-1.5 shadow-sm"
-              >
-                <Download size={12} />
-                <span>{queueSignals.isExporting() ? "Rendering..." : "Render All"}</span>
-              </button>
-            </div>
-          </Show>
-        </Show>
+            </Show>
+          </div>
+        </div>
       </div>
 
-      {/* Main Container */}
-      <div class="flex-1 overflow-y-auto min-h-0 divide-y divide-zinc-900">
+      {/* ===================== CARDS SCROLL LIST ===================== */}
+      <div class="flex-1 overflow-y-auto min-h-0 p-2 space-y-2">
         <Show
           when={activeTab() === "parts"}
           fallback={
-            /* Vertical Shorts List */
+            /* ===================== SHORTS CARDS ===================== */
             <Show
-              when={shortClips().length > 0}
+              when={filteredShorts().length > 0}
               fallback={
-                <div class="flex flex-col items-center justify-center h-full p-8 text-center text-zinc-500 text-xs gap-2">
-                  <Film size={22} class="text-zinc-600" />
-                  <span class="font-semibold text-zinc-400">No vertical shorts created yet</span>
-                  <p class="text-[10px] text-zinc-500 max-w-sm">
-                    Click <span class="text-amber-400 font-semibold">+ Create Short</span> above or use the Studio Preview selection tool to isolate viral moments and stack video frames into 9:16 vertical shorts.
+                <div class="flex flex-col items-center justify-center h-48 p-6 text-center text-zinc-500 text-xs gap-2">
+                  <Film size={24} class="text-zinc-600" />
+                  <span class="font-semibold text-zinc-300">
+                    {filter() !== "all" ? `No ${filter()} vertical shorts` : "No vertical shorts created yet"}
+                  </span>
+                  <p class="text-[11px] text-zinc-500 max-w-xs">
+                    {filter() !== "all"
+                      ? "Switch filter to 'All' or create shorts from the studio timeline."
+                      : "Click '+ Create Short' or mark In/Out points on the timeline to stack video into viral 9:16 clips."}
                   </p>
                 </div>
               }
             >
-              <For each={shortClips()}>
+              <For each={filteredShorts()}>
                 {(short, idx) => {
                   const clip = () => shortToClip(short, idx());
                   const queueItem = () => getActiveQueueItem(short.id);
@@ -278,15 +338,18 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                   const isCurrentlyRendering = () =>
                     queueItem()?.status === "rendering" ||
                     queueSignals.singleRenderingClipId() === short.id;
+                  const isPlayingCurrent = () =>
+                    timelineSignals.currentTime() >= short.start &&
+                    timelineSignals.currentTime() < short.end;
 
                   const templateLabel = () => {
                     switch (short.framingTemplate) {
                       case "stacked_split":
-                        return "Stacked Split: Cam+Game";
+                        return "Cam+Game Split";
                       case "split_50_50":
                         return "50/50 Split";
                       case "pan_scan":
-                        return "Pan & Scan 9:16 Crop";
+                        return "Pan & Scan";
                       case "blur_fill":
                       default:
                         return "Blur Fill";
@@ -294,100 +357,138 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                   };
 
                   return (
-                    <div class="px-4 py-2.5 hover:bg-zinc-900/40 transition flex items-center justify-between gap-3 text-xs">
-                      {/* Left: Short Label & Time Range */}
-                      <div class="flex items-center gap-3 min-w-0">
-                        <button
-                          type="button"
-                          onClick={() => playClip(short.start)}
-                          class="w-6 h-6 rounded bg-zinc-900 hover:bg-amber-600 text-zinc-400 hover:text-white flex items-center justify-center cursor-pointer transition shrink-0"
-                          title="Preview from short start"
-                        >
-                          <Play size={10} />
-                        </button>
+                    <div
+                      class={`p-2.5 rounded-lg border transition flex flex-col gap-1.5 ${
+                        isPlayingCurrent()
+                          ? "bg-amber-950/20 border-amber-500/50 ring-1 ring-amber-500/30"
+                          : "bg-zinc-900/40 hover:bg-zinc-900/80 border-zinc-800/80 hover:border-zinc-700/80"
+                      }`}
+                    >
+                      {/* Row 1: Header - Play + Title + Time + Status */}
+                      <div class="flex items-center justify-between gap-2 min-w-0">
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                          <button
+                            type="button"
+                            onClick={() => playClip(short.start)}
+                            class={`w-6 h-6 rounded flex items-center justify-center cursor-pointer transition shrink-0 ${
+                              isPlayingCurrent()
+                                ? "bg-amber-600 text-white shadow-sm"
+                                : "bg-zinc-800 hover:bg-amber-600 text-zinc-400 hover:text-white"
+                            }`}
+                            title="Preview short in studio player"
+                          >
+                            <Play size={10} />
+                          </button>
 
-                        <div class="min-w-0">
-                          <div class="flex items-center gap-2">
-                            <span class="font-bold text-amber-200">
-                              {short.title || `Short #${idx() + 1}`}
+                          <span class="font-bold text-amber-200 text-xs shrink-0 truncate max-w-[140px]">
+                            {short.title || `Short #${idx() + 1}`}
+                          </span>
+
+                          <span class="text-[11px] font-mono text-zinc-400 tabular-nums truncate">
+                            {formatTime(short.start)} → {formatTime(short.end)}
+                            <span class="text-zinc-500 ml-1">({durationSec.toFixed(1)}s)</span>
+                          </span>
+                        </div>
+
+                        {/* Status Badge */}
+                        <div class="shrink-0">
+                          <Show when={isCurrentlyRendering()}>
+                            <div class="flex items-center gap-1.5 text-[10px] font-mono text-amber-400 bg-amber-950/70 border border-amber-800/60 px-2 py-0.5 rounded-full">
+                              <RefreshCw size={10} class="animate-spin" />
+                              <span>{queueItem()?.progress || 0}%</span>
+                            </div>
+                          </Show>
+
+                          <Show when={isRendered() && !isCurrentlyRendering()}>
+                            <div class="flex items-center gap-1 text-[10px] font-mono text-emerald-300 bg-emerald-950/70 border border-emerald-800/60 px-2 py-0.5 rounded-full">
+                              <CheckCircle2 size={10} />
+                              <span>Ready</span>
+                              <Show when={renderedInfo()?.fileSizeBytes}>
+                                <span class="opacity-80">({formatFileSize(renderedInfo()!.fileSizeBytes)})</span>
+                              </Show>
+                            </div>
+                          </Show>
+
+                          <Show when={!isRendered() && !isCurrentlyRendering()}>
+                            <span class="text-[10px] font-mono text-zinc-400 px-2 py-0.5 rounded-full bg-zinc-800/80 border border-zinc-700/50">
+                              Queued
                             </span>
-                            <span class="text-[9px] font-mono uppercase px-1.5 py-0.2 rounded bg-amber-950/60 border border-amber-800/50 text-amber-300">
-                              {templateLabel()}
-                            </span>
-                          </div>
-                          <div class="text-[11px] font-mono text-zinc-500 tabular-nums">
-                            {formatTime(short.start)} → {formatTime(short.end)}{" "}
-                            <span class="text-zinc-600">({durationSec.toFixed(1)}s)</span>
-                          </div>
+                          </Show>
                         </div>
                       </div>
 
-                      {/* Right: Actions */}
-                      <div class="flex items-center gap-2 shrink-0">
-                        <Show when={isCurrentlyRendering()}>
-                          <div class="flex items-center gap-2 text-[11px] font-mono text-amber-400 bg-amber-950/40 border border-amber-800/40 px-2 py-0.5 rounded">
-                            <RefreshCw size={11} class="animate-spin" />
-                            <span>{queueItem()?.progress || 0}%</span>
-                          </div>
-                        </Show>
+                      {/* Row 2: Template Tag + Filename */}
+                      <div class="flex items-center gap-2 pl-8 text-[10px]">
+                        <span class="font-mono uppercase px-1.5 py-0.2 rounded bg-amber-950/50 border border-amber-800/40 text-amber-300 shrink-0">
+                          {templateLabel()}
+                        </span>
+                        <span class="font-mono text-zinc-500 truncate">
+                          {clip().outputName}
+                        </span>
+                      </div>
 
-                        <Show when={isRendered() && !isCurrentlyRendering()}>
-                          <div class="flex items-center gap-1.5 text-[11px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded">
-                            <CheckCircle2 size={11} />
-                            <span>Ready</span>
-                            <Show when={renderedInfo()?.fileSizeBytes}>
-                              <span class="text-emerald-500/80">
-                                ({formatFileSize(renderedInfo()!.fileSizeBytes)})
-                              </span>
-                            </Show>
-                          </div>
-                        </Show>
+                      {/* Row 3: Action Buttons & Delete */}
+                      <div class="flex items-center justify-between gap-2 pt-0.5 pl-8">
+                        <div class="flex items-center gap-1 text-[10px] text-zinc-500 font-mono">
+                          <span>9:16 Vertical</span>
+                        </div>
 
-                        <Show when={isRendered()}>
+                        <div class="flex items-center gap-1.5 shrink-0 ml-auto">
+                          <Show
+                            when={isRendered()}
+                            fallback={
+                              <button
+                                type="button"
+                                disabled={isCurrentlyRendering()}
+                                onClick={() => handleRenderSingleShort(short, idx())}
+                                class="h-6 px-2.5 rounded bg-amber-600 hover:bg-amber-500 text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm cursor-pointer disabled:opacity-50"
+                                title="Render 9:16 vertical short"
+                              >
+                                <Download size={10} />
+                                <span>Render</span>
+                              </button>
+                            }
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleOpenFile(short.id)}
+                              class="h-6 px-2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-medium flex items-center gap-1 transition cursor-pointer border border-zinc-700/60"
+                              title="Show exported file in folder"
+                            >
+                              <ExternalLink size={10} />
+                              <span>Open</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => props.onPublishClip?.(clip())}
+                              class="h-6 px-2.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm cursor-pointer"
+                              title="Publish to YouTube Shorts, Reels, or TikTok"
+                            >
+                              <Share size={10} />
+                              <span>Publish</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={isCurrentlyRendering()}
+                              onClick={() => handleRenderSingleShort(short, idx())}
+                              class="h-6 px-1.5 rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 text-[10px] flex items-center gap-1 transition cursor-pointer"
+                              title="Re-render this short"
+                            >
+                              <RefreshCw size={10} />
+                            </button>
+                          </Show>
+
                           <button
                             type="button"
-                            onClick={() => props.onPublishClip?.(clip())}
-                            class="h-7 px-2.5 rounded bg-blue-950/40 hover:bg-blue-900/60 text-blue-300 hover:text-white border border-blue-800/50 text-[11px] font-medium cursor-pointer transition flex items-center gap-1 shadow-sm"
-                            title="Publish to YouTube Shorts, Reels, or TikTok"
+                            onClick={() => projectSignals.removeShortClip(short.id)}
+                            class="w-6 h-6 rounded hover:bg-red-950/50 text-zinc-500 hover:text-red-400 flex items-center justify-center transition cursor-pointer"
+                            title="Delete short from timeline"
                           >
-                            <Share size={11} />
-                            <span>Publish</span>
+                            <Trash2 size={11} />
                           </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleOpenFile(short.id)}
-                            class="h-7 px-2.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 text-[11px] font-medium cursor-pointer transition flex items-center gap-1"
-                            title="Show exported file in folder"
-                          >
-                            <ExternalLink size={11} />
-                            <span>Open</span>
-                          </button>
-                        </Show>
-
-                        <button
-                          type="button"
-                          disabled={isCurrentlyRendering()}
-                          onClick={() => handleRenderSingleShort(short, idx())}
-                          class={`h-7 px-2.5 rounded text-[11px] font-medium cursor-pointer transition flex items-center gap-1 ${
-                            isRendered()
-                              ? "bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800"
-                              : "bg-amber-600/90 hover:bg-amber-500 text-white shadow-sm font-semibold"
-                          }`}
-                          title={isRendered() ? "Re-render this short" : "Render 9:16 vertical short"}
-                        >
-                          <Download size={11} />
-                          <span>{isRendered() ? "Re-render" : "Render Short"}</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => projectSignals.removeShortClip(short.id)}
-                          class="w-7 h-7 rounded hover:bg-red-950/50 text-zinc-500 hover:text-red-400 flex items-center justify-center transition cursor-pointer"
-                          title="Delete short from timeline"
-                        >
-                          <Trash2 size={12} />
-                        </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -396,19 +497,24 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
             </Show>
           }
         >
-          {/* Episodic Parts List */}
+          {/* ===================== PARTS CARDS ===================== */}
           <Show
-            when={clips().length > 0}
+            when={filteredClips().length > 0}
             fallback={
-              <div class="flex flex-col items-center justify-center h-full p-8 text-center text-zinc-500 text-xs gap-1.5">
-                <span>No clips in manifest</span>
-                <span class="text-[10px] text-zinc-600">
-                  Load video in Media Pool or click "Divide into Parts" on the timeline
+              <div class="flex flex-col items-center justify-center h-48 p-6 text-center text-zinc-500 text-xs gap-2">
+                <Scissors size={24} class="text-zinc-600" />
+                <span class="font-semibold text-zinc-300">
+                  {filter() !== "all" ? `No ${filter()} part clips` : "No clips in manifest"}
                 </span>
+                <p class="text-[11px] text-zinc-500 max-w-xs">
+                  {filter() !== "all"
+                    ? "Try switching to 'All' or render clips using the batch render button above."
+                    : "Load a stream in the Media Pool or click 'Divide into Parts' on the timeline."}
+                </p>
               </div>
             }
           >
-            <For each={clips()}>
+            <For each={filteredClips()}>
               {(clip) => {
                 const queueItem = () => getActiveQueueItem(clip.id);
                 const isRendered = () => queueSignals.isClipRendered(clip.id);
@@ -417,55 +523,97 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                 const isCurrentlyRendering = () =>
                   queueItem()?.status === "rendering" ||
                   queueSignals.singleRenderingClipId() === clip.id;
+                const isPlayingCurrent = () =>
+                  timelineSignals.currentTime() >= clip.sourceStartSeconds &&
+                  timelineSignals.currentTime() < clip.sourceEndSeconds;
 
                 return (
-                  <div class="px-4 py-2.5 hover:bg-zinc-900/40 transition flex items-center justify-between gap-3 text-xs">
-                    {/* Left: Part Label & Time Range */}
-                    <div class="flex items-center gap-3 min-w-0">
-                      <button
-                        type="button"
-                        onClick={() => playClip(clip.sourceStartSeconds)}
-                        class="w-6 h-6 rounded bg-zinc-900 hover:bg-blue-600 text-zinc-400 hover:text-white flex items-center justify-center cursor-pointer transition shrink-0"
-                        title="Play from clip start"
-                      >
-                        <Play size={10} />
-                      </button>
+                  <div
+                    class={`p-2.5 rounded-lg border transition flex flex-col gap-1.5 ${
+                      isPlayingCurrent()
+                        ? "bg-blue-950/25 border-blue-500/50 ring-1 ring-blue-500/30"
+                        : "bg-zinc-900/40 hover:bg-zinc-900/80 border-zinc-800/80 hover:border-zinc-700/80"
+                    }`}
+                  >
+                    {/* Row 1: Header - Play button + Title + Timecode + Status Badge */}
+                    <div class="flex items-center justify-between gap-2 min-w-0">
+                      <div class="flex items-center gap-2 min-w-0 flex-1">
+                        <button
+                          type="button"
+                          onClick={() => playClip(clip.sourceStartSeconds)}
+                          class={`w-6 h-6 rounded flex items-center justify-center cursor-pointer transition shrink-0 ${
+                            isPlayingCurrent()
+                              ? "bg-blue-600 text-white shadow-sm"
+                              : "bg-zinc-800 hover:bg-blue-600 text-zinc-400 hover:text-white"
+                          }`}
+                          title="Play from clip start"
+                        >
+                          <Play size={10} />
+                        </button>
 
-                      <div class="min-w-0">
-                        <div class="flex items-center gap-2">
-                          <span class="font-bold text-zinc-200">{clip.title}</span>
-                          <span class="text-[10px] font-mono text-zinc-500 truncate max-w-[220px]">
-                            {clip.outputName}
+                        <span class="font-bold text-zinc-100 text-xs shrink-0">
+                          {clip.title}
+                        </span>
+
+                        <span class="text-[11px] font-mono text-zinc-400 tabular-nums truncate">
+                          {formatTime(clip.sourceStartSeconds)} → {formatTime(clip.sourceEndSeconds)}
+                          <span class="text-zinc-500 ml-1">({durationSec.toFixed(1)}s)</span>
+                        </span>
+                      </div>
+
+                      {/* Status Badge */}
+                      <div class="shrink-0">
+                        <Show when={isCurrentlyRendering()}>
+                          <div class="flex items-center gap-1.5 text-[10px] font-mono text-blue-400 bg-blue-950/70 border border-blue-800/60 px-2 py-0.5 rounded-full">
+                            <RefreshCw size={10} class="animate-spin" />
+                            <span>{queueItem()?.progress || 0}%</span>
+                          </div>
+                        </Show>
+
+                        <Show when={isRendered() && !isCurrentlyRendering()}>
+                          <div class="flex items-center gap-1 text-[10px] font-mono text-emerald-300 bg-emerald-950/70 border border-emerald-800/60 px-2 py-0.5 rounded-full">
+                            <CheckCircle2 size={10} />
+                            <span>Ready</span>
+                            <Show when={renderedInfo()?.fileSizeBytes}>
+                              <span class="opacity-80">({formatFileSize(renderedInfo()!.fileSizeBytes)})</span>
+                            </Show>
+                          </div>
+                        </Show>
+
+                        <Show when={!isRendered() && !isCurrentlyRendering()}>
+                          <span class="text-[10px] font-mono text-zinc-400 px-2 py-0.5 rounded-full bg-zinc-800/80 border border-zinc-700/50">
+                            Queued
                           </span>
-                        </div>
-                        <div class="text-[11px] font-mono text-zinc-500 tabular-nums">
-                          {formatTime(clip.sourceStartSeconds)} → {formatTime(clip.sourceEndSeconds)}{" "}
-                          <span class="text-zinc-600">({durationSec.toFixed(1)}s)</span>
-                        </div>
+                        </Show>
+                      </div>
+                    </div>
 
-                        {/* Publishing History Badges */}
+                    {/* Row 2: Clean Filename */}
+                    <div class="text-[10px] font-mono text-zinc-500 truncate pl-8">
+                      {clip.outputName}
+                    </div>
+
+                    {/* Row 3: Action Buttons & Published History */}
+                    <div class="flex items-center justify-between gap-2 pt-0.5 pl-8">
+                      {/* Left: Published Badges */}
+                      <div class="flex items-center gap-1 flex-wrap min-w-0">
                         {(() => {
                           const history = publishHistorySignals.getClipPublishHistory(clip.id);
                           const hasYT = history.some((r) => r.platform === "youtube");
                           const hasInsta = history.some((r) => r.platform === "instagram");
                           const hasTT = history.some((r) => r.platform === "tiktok");
-                          const hasStudio = history.some((r) => r.platform === "youtube_studio");
                           const ytRecord = history.find((r) => r.platform === "youtube");
 
-                          if (!hasYT && !hasInsta && !hasTT && !hasStudio) return null;
+                          if (!hasYT && !hasInsta && !hasTT) return null;
 
                           return (
-                            <div class="flex items-center gap-1.5 mt-1 flex-wrap">
-                              <span class="text-[9px] text-zinc-500 font-semibold uppercase tracking-wider">
-                                Published:
-                              </span>
-
+                            <div class="flex items-center gap-1 flex-wrap">
                               <Show when={hasYT}>
                                 <span
-                                  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-950/50 text-red-300 border border-red-800/50 text-[10px] font-medium"
-                                  title={`Uploaded to YouTube Shorts${ytRecord?.publishedAt ? ` on ${new Date(ytRecord.publishedAt).toLocaleDateString()}` : ""}`}
+                                  class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-red-950/60 text-red-300 border border-red-800/50 text-[9px] font-medium"
+                                  title="Uploaded to YouTube Shorts"
                                 >
-                                  <YouTubeIcon size={10} class="text-red-500" />
+                                  <YouTubeIcon size={9} class="text-red-500" />
                                   <span>Shorts</span>
                                   <Show when={ytRecord?.url}>
                                     <button
@@ -474,120 +622,81 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                                         e.stopPropagation();
                                         openBrowserUrl(ytRecord!.url!);
                                       }}
-                                      class="hover:text-white ml-0.5 cursor-pointer text-red-400"
+                                      class="hover:text-white cursor-pointer text-red-400"
                                       title="View on YouTube"
                                     >
-                                      <ExternalLink size={9} />
+                                      <ExternalLink size={8} />
                                     </button>
                                   </Show>
                                 </span>
                               </Show>
 
                               <Show when={hasInsta}>
-                                <span
-                                  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-pink-950/50 text-pink-300 border border-pink-800/50 text-[10px] font-medium"
-                                  title="Launched to Instagram Reels"
-                                >
-                                  <InstagramIcon size={10} class="text-pink-400" />
+                                <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-pink-950/60 text-pink-300 border border-pink-800/50 text-[9px] font-medium">
+                                  <InstagramIcon size={9} class="text-pink-400" />
                                   <span>Reels</span>
                                 </span>
                               </Show>
 
                               <Show when={hasTT}>
-                                <span
-                                  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-950/50 text-cyan-300 border border-cyan-800/50 text-[10px] font-medium"
-                                  title="Launched to TikTok Studio"
-                                >
-                                  <TikTokIcon size={10} class="text-cyan-400" />
+                                <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-800/50 text-[9px] font-medium">
+                                  <TikTokIcon size={9} class="text-cyan-400" />
                                   <span>TikTok</span>
-                                </span>
-                              </Show>
-
-                              <Show when={hasStudio}>
-                                <span
-                                  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-950/50 text-amber-300 border border-amber-800/50 text-[10px] font-medium"
-                                  title="Launched to YouTube Studio Web"
-                                >
-                                  <YouTubeIcon size={10} class="text-amber-500" />
-                                  <span>YT Studio</span>
                                 </span>
                               </Show>
                             </div>
                           );
                         })()}
                       </div>
-                    </div>
 
-                    {/* Right: Status Pill & Actions */}
-                    <div class="flex items-center gap-2 shrink-0">
-                      {/* Rendering In Progress */}
-                      <Show when={isCurrentlyRendering()}>
-                        <div class="flex items-center gap-2 text-[11px] font-mono text-blue-400 bg-blue-950/40 border border-blue-800/40 px-2 py-0.5 rounded">
-                          <RefreshCw size={11} class="animate-spin" />
-                          <span>{queueItem()?.progress || 0}%</span>
-                          <Show when={queueItem()?.speed}>
-                            <span class="text-zinc-500">({queueItem()?.speed})</span>
-                          </Show>
-                        </div>
-                      </Show>
-
-                      {/* Completed */}
-                      <Show when={isRendered() && !isCurrentlyRendering()}>
-                        <div class="flex items-center gap-1.5 text-[11px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded">
-                          <CheckCircle2 size={11} />
-                          <span>Ready</span>
-                          <Show when={renderedInfo()?.fileSizeBytes}>
-                            <span class="text-emerald-500/80">
-                              ({formatFileSize(renderedInfo()!.fileSizeBytes)})
-                            </span>
-                          </Show>
-                        </div>
-                      </Show>
-
-                      {/* Pending */}
-                      <Show when={!isRendered() && !isCurrentlyRendering()}>
-                        <span class="text-[10px] font-mono text-zinc-500 px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800">
-                          Queued
-                        </span>
-                      </Show>
-
-                      {/* Action Buttons */}
-                      <Show when={isRendered()}>
-                        <button
-                          type="button"
-                          onClick={() => props.onPublishClip?.(clip)}
-                          class="h-7 px-2.5 rounded bg-blue-950/40 hover:bg-blue-900/60 text-blue-300 hover:text-white border border-blue-800/50 text-[11px] font-medium cursor-pointer transition flex items-center gap-1 shadow-sm"
-                          title="Publish to YouTube Shorts or launch Instagram/TikTok web uploader"
+                      {/* Right: Actions */}
+                      <div class="flex items-center gap-1.5 shrink-0 ml-auto">
+                        <Show
+                          when={isRendered()}
+                          fallback={
+                            <button
+                              type="button"
+                              disabled={isCurrentlyRendering()}
+                              onClick={() => handleRenderSingleClip(clip)}
+                              class="h-6 px-2.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm cursor-pointer disabled:opacity-50"
+                              title="Render this clip now"
+                            >
+                              <Download size={10} />
+                              <span>Render</span>
+                            </button>
+                          }
                         >
-                          <Share size={11} />
-                          <span>Publish</span>
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenFile(clip.id)}
+                            class="h-6 px-2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-medium flex items-center gap-1 transition cursor-pointer border border-zinc-700/60"
+                            title="Show exported file in folder"
+                          >
+                            <ExternalLink size={10} />
+                            <span>Open</span>
+                          </button>
 
-                        <button
-                          type="button"
-                          onClick={() => handleOpenFile(clip.id)}
-                          class="h-7 px-2.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 text-[11px] font-medium cursor-pointer transition flex items-center gap-1"
-                          title="Show exported file in folder"
-                        >
-                          <ExternalLink size={11} />
-                          <span>Open</span>
-                        </button>
-                      </Show>
+                          <button
+                            type="button"
+                            onClick={() => props.onPublishClip?.(clip)}
+                            class="h-6 px-2.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-semibold flex items-center gap-1 transition shadow-sm cursor-pointer"
+                            title="Publish to YouTube Shorts, Reels, or TikTok"
+                          >
+                            <Share size={10} />
+                            <span>Publish</span>
+                          </button>
 
-                      <button
-                        type="button"
-                        disabled={isCurrentlyRendering()}
-                        onClick={() => handleRenderSingleClip(clip)}
-                        class={`h-7 px-2.5 rounded text-[11px] font-medium cursor-pointer transition flex items-center gap-1 ${
-                          isRendered()
-                            ? "bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800"
-                            : "bg-blue-600/90 hover:bg-blue-600 text-white shadow-sm"
-                        }`}
-                        title={isRendered() ? "Re-render this clip" : "Render this clip now"}
-                      >
-                        <Download size={11} />
-                        <span>{isRendered() ? "Re-render" : "Render"}</span>
-                      </button>
+                          <button
+                            type="button"
+                            disabled={isCurrentlyRendering()}
+                            onClick={() => handleRenderSingleClip(clip)}
+                            class="h-6 px-1.5 rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 text-[10px] flex items-center gap-1 transition cursor-pointer"
+                            title="Re-render this clip"
+                          >
+                            <RefreshCw size={10} />
+                          </button>
+                        </Show>
+                      </div>
                     </div>
                   </div>
                 );

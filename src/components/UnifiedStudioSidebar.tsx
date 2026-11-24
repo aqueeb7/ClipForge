@@ -75,7 +75,7 @@ export const UnifiedStudioSidebar: Component<UnifiedStudioSidebarProps> = (props
   return (
     <aside
       class={`h-full shrink-0 select-none transition-all duration-200 flex flex-col ${
-        isCollapsed() ? "w-11" : "w-[410px]"
+        isCollapsed() ? "w-11" : "w-[425px]"
       }`}
     >
       <div class="h-full w-full bg-zinc-950 border border-zinc-800/80 rounded-xl flex flex-col overflow-hidden shadow-2xl">
