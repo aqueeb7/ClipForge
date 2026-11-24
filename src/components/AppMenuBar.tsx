@@ -9,7 +9,7 @@ interface AppMenuBarProps {
   onOpenNewProject: () => void;
   onOpenShortcuts: () => void;
   onOpenSettings: () => void;
-  onToggleInspector: () => void;
+  onToggleInspector?: () => void;
 }
 
 export const AppMenuBar: Component<AppMenuBarProps> = (props) => {
@@ -121,7 +121,11 @@ export const AppMenuBar: Component<AppMenuBarProps> = (props) => {
 
   function handleToggleInspector() {
     closeMenus();
-    props.onToggleInspector();
+    if (props.onToggleInspector) {
+      props.onToggleInspector();
+    } else {
+      projectSignals.toggleStudioSidebar();
+    }
   }
 
   function handleZoomIn() {
@@ -213,7 +217,7 @@ export const AppMenuBar: Component<AppMenuBarProps> = (props) => {
       handleSplitPart();
     } else if (isCtrlOrCmd && e.key.toLowerCase() === "b") {
       e.preventDefault();
-      props.onToggleInspector();
+      handleToggleInspector();
     } else if (isCtrlOrCmd && e.key.toLowerCase() === "e") {
       e.preventDefault();
       handleOpenExports();
@@ -277,7 +281,7 @@ export const AppMenuBar: Component<AppMenuBarProps> = (props) => {
             projectSignals.setWorkspaceTab("deliver");
             break;
           case "menu_toggle_sidebar":
-            props.onToggleInspector();
+            handleToggleInspector();
             break;
           case "menu_render_remaining":
             handleRenderRemaining();

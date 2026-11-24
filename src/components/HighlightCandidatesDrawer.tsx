@@ -23,7 +23,11 @@ function formatTime(seconds: number): string {
   return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 }
 
-export const HighlightCandidatesDrawer: Component = () => {
+interface HighlightCandidatesDrawerProps {
+  onClose?: () => void;
+}
+
+export const HighlightCandidatesDrawer: Component<HighlightCandidatesDrawerProps> = (props) => {
   const [showSettings, setShowSettings] = createSignal(false);
 
   const candidates = () => intelligenceSignals.filteredCandidates();
@@ -89,7 +93,13 @@ export const HighlightCandidatesDrawer: Component = () => {
 
           <button
             type="button"
-            onClick={() => intelligenceSignals.closeCandidatesDrawer()}
+            onClick={() => {
+              if (props.onClose) {
+                props.onClose();
+              } else {
+                intelligenceSignals.closeCandidatesDrawer();
+              }
+            }}
             class="p-1.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100 border border-zinc-800 text-xs transition cursor-pointer"
             title="Close Drawer"
           >

@@ -63,6 +63,24 @@ const [activeWorkspaceTab, setActiveWorkspaceTabState] = createSignal<"media" | 
 const [isVideoAudioMuted, setIsVideoAudioMuted] = createSignal<boolean>(false);
 const [isDedicatedAudioMuted, setIsDedicatedAudioMuted] = createSignal<boolean>(false);
 
+// Studio Sidebar Navigation (3-Zone Studio Architecture)
+export type StudioSidebarTab = "framing" | "clips" | "intelligence" | "audio";
+const [activeStudioSidebarTab, setActiveStudioSidebarTab] = createSignal<StudioSidebarTab>("framing");
+const [isStudioSidebarCollapsed, setIsStudioSidebarCollapsed] = createSignal<boolean>(false);
+const [intelSubTab, setIntelSubTab] = createSignal<"highlights" | "chat">("highlights");
+
+function openStudioSidebarTab(tab: StudioSidebarTab, sub?: "highlights" | "chat") {
+  setActiveStudioSidebarTab(tab);
+  setIsStudioSidebarCollapsed(false);
+  if (sub) {
+    setIntelSubTab(sub);
+  }
+}
+
+function toggleStudioSidebar() {
+  setIsStudioSidebarCollapsed(!isStudioSidebarCollapsed());
+}
+
 // Project File & Persistence State
 const [projectFilePath, setProjectFilePath] = createSignal<string | null>(null);
 const [streamProjectDir, setStreamProjectDirState] = createSignal<string | null>(null);
@@ -1267,6 +1285,16 @@ export const projectSignals = {
   updateShortClip,
   clearShortClips,
   saveAndCloseProject,
+
+  // Studio Sidebar (3-Zone Studio)
+  activeStudioSidebarTab,
+  setActiveStudioSidebarTab,
+  isStudioSidebarCollapsed,
+  setIsStudioSidebarCollapsed,
+  intelSubTab,
+  setIntelSubTab,
+  openStudioSidebarTab,
+  toggleStudioSidebar,
 
   // Memos
   hasProject,

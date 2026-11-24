@@ -44,7 +44,11 @@ function formatOffset(seconds: number): string {
   return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 }
 
-export const ChatReplayDrawer: Component = () => {
+interface ChatReplayDrawerProps {
+  onClose?: () => void;
+}
+
+export const ChatReplayDrawer: Component<ChatReplayDrawerProps> = (props) => {
   let scrollContainerRef: HTMLDivElement | undefined;
   let activeItemRef: HTMLDivElement | undefined;
 
@@ -167,7 +171,13 @@ export const ChatReplayDrawer: Component = () => {
 
           <button
             type="button"
-            onClick={() => chatReplaySignals.setIsDrawerOpen(false)}
+            onClick={() => {
+              if (props.onClose) {
+                props.onClose();
+              } else {
+                chatReplaySignals.setIsDrawerOpen(false);
+              }
+            }}
             class="p-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition cursor-pointer"
             title="Close Chat Drawer"
           >
