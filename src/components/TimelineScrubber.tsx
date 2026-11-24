@@ -3,6 +3,7 @@ import { projectSignals } from "../stores/project";
 import { timelineSignals } from "../stores/timeline";
 import { chatReplaySignals } from "../stores/chatReplay";
 import { intelligenceSignals } from "../stores/intelligence";
+import { historySignals } from "../stores/history";
 import {
   Film,
   Scissors,
@@ -17,6 +18,8 @@ import {
   Type,
   Layers,
   ChevronDown,
+  Undo,
+  Redo,
 } from "./Icons";
 
 interface TrimmingState {
@@ -442,8 +445,34 @@ export const TimelineScrubber: Component = () => {
           </span>
         </div>
 
-        {/* Center: Trimming & Split Controls */}
+        {/* Center: Trimming, Split & History Controls */}
         <div class="flex items-center gap-1.5">
+          {/* Undo / Redo Toolbar */}
+          <div class="flex items-center bg-zinc-900 p-0.5 rounded-lg border border-zinc-800">
+            <button
+              type="button"
+              disabled={!projectSignals.canUndo()}
+              onClick={() => projectSignals.undo()}
+              class="px-2 py-1 rounded text-zinc-400 hover:text-white disabled:opacity-30 disabled:hover:text-zinc-400 disabled:cursor-not-allowed cursor-pointer transition flex items-center gap-1 text-[11px]"
+              title={projectSignals.canUndo() ? `Undo: ${projectSignals.undoLabel()} (Ctrl+Z)` : "Undo (Ctrl+Z)"}
+            >
+              <Undo size={11} />
+              <span class="hidden lg:inline">Undo</span>
+            </button>
+            <button
+              type="button"
+              disabled={!projectSignals.canRedo()}
+              onClick={() => projectSignals.redo()}
+              class="px-2 py-1 rounded text-zinc-400 hover:text-white disabled:opacity-30 disabled:hover:text-zinc-400 disabled:cursor-not-allowed cursor-pointer transition flex items-center gap-1 text-[11px]"
+              title={projectSignals.canRedo() ? `Redo: ${projectSignals.redoLabel()} (Ctrl+Y)` : "Redo (Ctrl+Y)"}
+            >
+              <Redo size={11} />
+              <span class="hidden lg:inline">Redo</span>
+            </button>
+          </div>
+
+          <div class="h-3 w-px bg-zinc-800 mx-0.5" />
+
           <Show
             when={projectSignals.isMasterStage()}
             fallback={
@@ -793,6 +822,7 @@ export const TimelineScrubber: Component = () => {
                         class="absolute left-0 top-0 bottom-0 w-2.5 cursor-ew-resize hover:bg-blue-300/40 z-30 group/handle flex items-center justify-center transition-colors"
                         onMouseDown={(e) => {
                           e.stopPropagation();
+                          historySignals.record("Trim Part Clip");
                           setTrimmingState({
                             id: clip.id,
                             type: "part",
@@ -821,6 +851,7 @@ export const TimelineScrubber: Component = () => {
                         class="absolute right-0 top-0 bottom-0 w-2.5 cursor-ew-resize hover:bg-blue-300/40 z-30 group/handle flex items-center justify-center transition-colors"
                         onMouseDown={(e) => {
                           e.stopPropagation();
+                          historySignals.record("Trim Part Clip");
                           setTrimmingState({
                             id: clip.id,
                             type: "part",
@@ -897,6 +928,7 @@ export const TimelineScrubber: Component = () => {
                         class="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-white/40 active:bg-white/70 z-30 group/handle flex items-center justify-center transition-colors"
                         onMouseDown={(e) => {
                           e.stopPropagation();
+                          historySignals.record("Trim Short");
                           setTrimmingState({
                             id: short.id,
                             type: "short",
@@ -941,6 +973,7 @@ export const TimelineScrubber: Component = () => {
                         class="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-white/40 active:bg-white/70 z-30 group/handle flex items-center justify-center transition-colors"
                         onMouseDown={(e) => {
                           e.stopPropagation();
+                          historySignals.record("Trim Short");
                           setTrimmingState({
                             id: short.id,
                             type: "short",

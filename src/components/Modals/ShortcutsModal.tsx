@@ -22,6 +22,8 @@ export const ShortcutsModal: Component<ShortcutsModalProps> = (props) => {
     {
       title: "Trimming & Slicing",
       shortcuts: [
+        { key: "Ctrl + Z", desc: "Undo Last Edit" },
+        { key: "Ctrl + Y / Ctrl + Shift + Z", desc: "Redo Edit" },
         { key: "[", desc: "Set In Point / Cut Intro" },
         { key: "]", desc: "Set Out Point / Cut Outro" },
         { key: "Ctrl + K", desc: "Split Clip at Playhead" },

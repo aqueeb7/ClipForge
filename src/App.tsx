@@ -57,7 +57,28 @@ export const App: Component = () => {
     triggerDebouncedAutoSave();
   });
 
+  function handleGlobalKeyDown(e: KeyboardEvent) {
+    const target = e.target as HTMLElement;
+    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+      return;
+    }
+
+    const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+    if (isCtrlOrCmd && e.key.toLowerCase() === "z") {
+      e.preventDefault();
+      if (e.shiftKey) {
+        projectSignals.redo();
+      } else {
+        projectSignals.undo();
+      }
+    } else if (isCtrlOrCmd && e.key.toLowerCase() === "y") {
+      e.preventDefault();
+      projectSignals.redo();
+    }
+  }
+
   onMount(async () => {
+    window.addEventListener("keydown", handleGlobalKeyDown);
     await projectSignals.checkSystemEnvironment();
     await projectSignals.restoreAutoSavedSession();
 
@@ -74,6 +95,7 @@ export const App: Component = () => {
   });
 
   onCleanup(() => {
+    window.removeEventListener("keydown", handleGlobalKeyDown);
     if (cleanupLifecycle) {
       cleanupLifecycle();
       cleanupLifecycle = null;

@@ -1,7 +1,7 @@
 import { Component, Show, createMemo } from "solid-js";
 import { projectSignals } from "../stores/project";
 import { queueSignals } from "../stores/queue";
-import { Cpu, Settings, HelpCircle, Plus, Film, Scissors, Download, CheckCircle2, FolderOpen, Save } from "./Icons";
+import { Cpu, Settings, HelpCircle, Plus, Film, Scissors, Download, CheckCircle2, FolderOpen, Save, Undo, Redo } from "./Icons";
 
 interface HeaderProps {
   onOpenSettings: () => void;
@@ -57,6 +57,28 @@ export const Header: Component<HeaderProps> = (props) => {
             >
               {projectSignals.workflowMode()}
             </span>
+
+            {/* Undo / Redo Toolbar */}
+            <div class="flex items-center bg-zinc-900 p-0.5 rounded-lg border border-zinc-800 ml-1">
+              <button
+                type="button"
+                disabled={!projectSignals.canUndo()}
+                onClick={() => projectSignals.undo()}
+                class="w-6 h-6 rounded flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-30 disabled:hover:text-zinc-400 disabled:cursor-not-allowed cursor-pointer transition"
+                title={projectSignals.canUndo() ? `Undo: ${projectSignals.undoLabel()} (Ctrl+Z)` : "Undo (Ctrl+Z)"}
+              >
+                <Undo size={12} />
+              </button>
+              <button
+                type="button"
+                disabled={!projectSignals.canRedo()}
+                onClick={() => projectSignals.redo()}
+                class="w-6 h-6 rounded flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-30 disabled:hover:text-zinc-400 disabled:cursor-not-allowed cursor-pointer transition"
+                title={projectSignals.canRedo() ? `Redo: ${projectSignals.redoLabel()} (Ctrl+Y)` : "Redo (Ctrl+Y)"}
+              >
+                <Redo size={12} />
+              </button>
+            </div>
           </Show>
         </div>
 

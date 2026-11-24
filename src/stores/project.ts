@@ -39,6 +39,7 @@ import {
   type SavedProjectDraft,
   type SessionSnapshot
 } from "../services/persistence.js";
+import { historySignals, initHistoryProvider } from "./history.js";
 
 // Core Signals
 const [currentProject, setCurrentProject] = createSignal<ClipForgeProject | null>(null);
@@ -85,6 +86,37 @@ function toggleStudioSidebar() {
 const [projectFilePath, setProjectFilePath] = createSignal<string | null>(null);
 const [streamProjectDir, setStreamProjectDirState] = createSignal<string | null>(null);
 const [isDirty, setIsDirty] = createSignal<boolean>(false);
+
+// Initialize Undo / Redo History Engine
+initHistoryProvider(
+  () => {
+    const p = currentProject();
+    if (!p) return null;
+    return {
+      project: p,
+      masterInSeconds: masterInSeconds(),
+      masterOutSeconds: masterOutSeconds(),
+      isMasterPatched: isMasterPatched(),
+      timelineStage: timelineStage(),
+      shortClips: shortClips(),
+      workflowMode: workflowMode()
+    };
+  },
+  (data) => {
+    setCurrentProject(data.project);
+    setMasterInSecondsState(data.masterInSeconds);
+    setMasterOutSecondsState(data.masterOutSeconds);
+    setIsMasterPatched(data.isMasterPatched);
+    setTimelineStageState(data.timelineStage);
+    setShortClips(data.shortClips);
+    setWorkflowModeState(data.workflowMode);
+    setIsDirty(true);
+    generatePlan();
+  },
+  (msg) => {
+    setStatusMessage(msg);
+  }
+);
 
 // Derived Accessors (Memos)
 const hasProject = createMemo(() => currentProject() !== null);
@@ -303,6 +335,7 @@ function updateProjectName(name: string) {
 function setAudioOffset(offsetMs: number) {
   const proj = currentProject();
   if (proj) {
+    historySignals.record("Adjust Audio Sync Offset");
     setCurrentProject({
       ...proj,
       synchronization: {
@@ -327,6 +360,7 @@ function setWorkspaceTab(tab: "media" | "edit" | "deliver") {
 function setMasterIn(timeSeconds: number) {
   const proj = currentProject();
   if (!proj) return;
+  historySignals.record("Cut Intro");
   const rawDur = videoMetadata()?.durationSeconds || 60;
   const currentOut = masterOutSeconds() || rawDur;
   const t = Math.max(0, Math.min(currentOut - 5, Math.round(timeSeconds * 10) / 10));
@@ -345,6 +379,7 @@ function setMasterIn(timeSeconds: number) {
 function setMasterOut(timeSeconds: number) {
   const proj = currentProject();
   if (!proj) return;
+  historySignals.record("Cut Outro");
   const rawDur = videoMetadata()?.durationSeconds || 60;
   const t = Math.min(rawDur, Math.max(masterInSeconds() + 5, Math.round(timeSeconds * 10) / 10));
   setMasterOutSecondsState(t);
@@ -362,6 +397,7 @@ function setMasterOut(timeSeconds: number) {
 function resetMasterTrim() {
   const proj = currentProject();
   if (!proj) return;
+  historySignals.record("Reset Master Trim");
   const rawDur = videoMetadata()?.durationSeconds || 60;
   setMasterInSecondsState(0);
   setMasterOutSecondsState(rawDur);
@@ -380,6 +416,7 @@ function resetMasterTrim() {
 function divideIntoParts() {
   const proj = currentProject();
   if (!proj) return;
+  historySignals.record("Divide into Parts");
   setIsMasterPatched(true);
   setTimelineStageState("parts");
   setActiveWorkspaceTabState("edit");
@@ -396,6 +433,7 @@ function divideIntoParts() {
 }
 
 function returnToMasterStream() {
+  historySignals.record("Return to Master Stream");
   setTimelineStageState("master");
   setStatusMessage("Returned to Master Stream view. You can adjust intro/outro trim or audio sync.");
 }
@@ -469,6 +507,7 @@ function setClippingMode(mode: "automatic" | "manual") {
 function addManualClipRange(start: number, end: number, title?: string) {
   const proj = currentProject();
   if (!proj) return;
+  historySignals.record("Add Clip");
   try {
     let baseProj = proj;
     if (baseProj.clipSettings.mode !== "manual") {
@@ -491,6 +530,7 @@ function addManualClipRange(start: number, end: number, title?: string) {
 function removeManualClipItem(index: number) {
   const proj = currentProject();
   if (!proj || proj.clipSettings.mode !== "manual") return;
+  historySignals.record("Remove Clip");
   try {
     const updated = coreRemoveManualClip(proj, index);
     setCurrentProject(updated);
@@ -553,6 +593,7 @@ function setWorkflowMode(mode: WorkflowMode) {
 }
 
 function addShortClip(start: number, end: number, options?: Partial<ShortClipItem>): ShortClipItem {
+  historySignals.record("Create Short");
   const dur = Math.max(1, end - start);
   const id = `short_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const title = options?.title || `Short #${shortClips().length + 1} (${Math.round(dur)}s)`;
@@ -586,6 +627,7 @@ function addShortClip(start: number, end: number, options?: Partial<ShortClipIte
 }
 
 function removeShortClip(id: string) {
+  historySignals.record("Delete Short");
   setShortClips((prev) => prev.filter((s) => s.id !== id));
   const proj = currentProject();
   if (proj) {
@@ -624,6 +666,7 @@ function updateComposition(composition: {
 }) {
   const proj = currentProject();
   if (!proj) return;
+  historySignals.record("Change Framing");
   setCurrentProject({
     ...proj,
     composition: {
@@ -669,6 +712,7 @@ function updateExportSettings(settings: Partial<ExportSettings>) {
 function splitClipAt(timeSeconds: number) {
   const proj = currentProject();
   if (!proj) return;
+  historySignals.record("Split Part");
   const t = Math.round(timeSeconds * 100) / 100;
 
   let workingProj = proj;
@@ -721,6 +765,7 @@ function splitClipAt(timeSeconds: number) {
 function deleteClipAt(timeSeconds: number, clipId?: string | null) {
   const proj = currentProject();
   if (!proj) return;
+  historySignals.record("Delete Part Clip");
 
   let workingProj = proj;
   if (workingProj.clipSettings.mode !== "manual") {
@@ -1100,6 +1145,7 @@ async function resumeDraft(draft: SavedProjectDraft): Promise<boolean> {
 
 function createNewProject(options?: { name?: string; durationSeconds?: number; outputDirectory?: string; workflowMode?: WorkflowMode }) {
   clearSessionState();
+  historySignals.clear();
   setCurrentProject(null);
   setVideoMetadata(null);
   setAudioMetadata(null);
@@ -1195,6 +1241,7 @@ async function openProject(filePath?: string): Promise<boolean> {
     }
 
     const proj = validation.project;
+    historySignals.clear();
     setCurrentProject(proj);
     setProjectFilePath(targetPath);
     setIsDirty(false);
@@ -1351,5 +1398,13 @@ export const projectSignals = {
   updateProjectName,
   saveProject,
   saveProjectAs,
-  openProject
+  openProject,
+
+  // History & Undo / Redo
+  undo: () => historySignals.undo(),
+  redo: () => historySignals.redo(),
+  canUndo: historySignals.canUndo,
+  canRedo: historySignals.canRedo,
+  undoLabel: historySignals.undoLabel,
+  redoLabel: historySignals.redoLabel
 };
