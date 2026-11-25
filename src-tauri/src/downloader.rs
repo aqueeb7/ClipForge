@@ -30,6 +30,7 @@ pub struct StreamFormatOption {
     pub is_video: bool,
     pub is_audio: bool,
     pub quality_label: String,
+    pub language: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -291,11 +292,49 @@ pub fn inspect_stream_url_internal(url: &str) -> Result<StreamUrlInspection, Str
                     is_video: true,
                     is_audio: false,
                     quality_label,
+                    language: None,
                 });
             } else if is_a && !is_v {
                 // Audio-only track
                 let abr = f.get("abr").and_then(|v| v.as_f64()).unwrap_or(128.0) as u32;
-                let quality_label = format!("Audio ({}kbps • {})", abr, ext.to_uppercase());
+                let lang = f.get("language").and_then(|v| v.as_str()).map(|s| s.to_string());
+                let format_note = f.get("format_note").and_then(|v| v.as_str());
+
+                let lang_display = if let Some(ref l) = lang {
+                    match l.to_lowercase().as_str() {
+                        "en" | "en-us" | "en-gb" | "en-ca" => "English".to_string(),
+                        "es" | "es-es" | "es-419" => "Spanish".to_string(),
+                        "hi" => "Hindi".to_string(),
+                        "de" => "German".to_string(),
+                        "fr" => "French".to_string(),
+                        "ja" => "Japanese".to_string(),
+                        "pt" | "pt-br" => "Portuguese".to_string(),
+                        "ru" => "Russian".to_string(),
+                        other => other.to_uppercase(),
+                    }
+                } else if let Some(note) = format_note {
+                    if note.to_lowercase().contains("orig") {
+                        "Original".to_string()
+                    } else if note.to_lowercase().contains("eng") {
+                        "English".to_string()
+                    } else {
+                        note.to_string()
+                    }
+                } else {
+                    "English / Default".to_string()
+                };
+
+                let note_suffix = if let Some(note) = format_note {
+                    if note.to_lowercase().contains("orig") && !lang_display.contains("Original") {
+                        " • Original"
+                    } else {
+                        ""
+                    }
+                } else {
+                    ""
+                };
+
+                let quality_label = format!("Audio • {}{} ({}kbps • {})", lang_display, note_suffix, abr, ext.to_uppercase());
 
                 audio_formats.push(StreamFormatOption {
                     format_id: fid,
@@ -310,6 +349,7 @@ pub fn inspect_stream_url_internal(url: &str) -> Result<StreamUrlInspection, Str
                     is_video: false,
                     is_audio: true,
                     quality_label,
+                    language: lang,
                 });
             }
         }
@@ -336,12 +376,22 @@ pub fn inspect_stream_url_internal(url: &str) -> Result<StreamUrlInspection, Str
         .map(|f| f.format_id.clone())
         .unwrap_or_else(|| "bestvideo".to_string());
 
+    // Prioritize English audio track (or original), then m4a with highest bitrate
     let recommended_audio = audio_formats
         .iter()
-        .find(|f| f.ext == "m4a")
+        .find(|f| {
+            if let Some(ref l) = f.language {
+                let lower = l.to_lowercase();
+                lower.starts_with("en")
+            } else {
+                let ql = f.quality_label.to_lowercase();
+                ql.contains("english") || ql.contains("original")
+            }
+        })
+        .or_else(|| audio_formats.iter().find(|f| f.ext == "m4a"))
         .or_else(|| audio_formats.first())
         .map(|f| f.format_id.clone())
-        .unwrap_or_else(|| "bestaudio".to_string());
+        .unwrap_or_else(|| "bestaudio[language=en]/bestaudio[language^=en]/bestaudio".to_string());
 
     Ok(StreamUrlInspection {
         url: clean_url.to_string(),
@@ -434,10 +484,16 @@ where
         message: "Starting separate audio stream download...".to_string(),
     });
 
+    let audio_format_selector = if req.audio_format_id == "bestaudio" {
+        "bestaudio[language=en]/bestaudio[language^=en]/bestaudio".to_string()
+    } else {
+        req.audio_format_id.clone()
+    };
+
     let audio_out_template = source_dir.join("audio.%(ext)s").to_string_lossy().to_string();
     let mut audio_child = Command::new(&ytdlp)
         .args([
-            "-f", &req.audio_format_id,
+            "-f", &audio_format_selector,
             "--newline",
             "-o", &audio_out_template,
             &req.url,

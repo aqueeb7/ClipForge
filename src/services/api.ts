@@ -820,6 +820,7 @@ export interface StreamFormatOption {
   is_video: boolean;
   is_audio: boolean;
   quality_label: string;
+  language?: string;
 }
 
 export interface StreamUrlInspection {

@@ -23,6 +23,7 @@ export const VideoPreview: Component = () => {
   let audioRef: HTMLAudioElement | undefined;
   let wideCanvasRef: HTMLDivElement | undefined;
   let verticalCanvasRef: HTMLCanvasElement | undefined;
+  let overlayContainerRef: HTMLDivElement | undefined;
   let animationFrameId: number | null = null;
 
   const [videoLoadError, setVideoLoadError] = createSignal<string | null>(null);
@@ -30,6 +31,36 @@ export const VideoPreview: Component = () => {
   const [volume, setVolume] = createSignal(1.0);
   const [activeZone, setActiveZone] = createSignal<"top" | "bottom" | "pan">("top");
   const [showCropControls, setShowCropControls] = createSignal(true);
+
+  type DragMode =
+    | "move"
+    | "resize-se"
+    | "resize-e"
+    | "resize-s"
+    | "resize-w"
+    | "resize-n"
+    | "resize-nw"
+    | "resize-ne"
+    | "resize-sw"
+    | null;
+
+  interface ActiveDragState {
+    zone: "top" | "bottom" | "pan";
+    mode: DragMode;
+    startMouseX: number;
+    startMouseY: number;
+    initialRegion: CropRegion;
+    containerWidth: number;
+    containerHeight: number;
+  }
+
+  const [activeDrag, setActiveDrag] = createSignal<ActiveDragState | null>(null);
+
+  const activeFps = createMemo(() => {
+    const vFps = projectSignals.videoMetadata()?.fps;
+    if (vFps && vFps > 0) return Math.round(vFps);
+    return timelineSignals.timelineFps() || 60;
+  });
 
   const videoUrl = projectSignals.videoAssetUrl;
   const audioUrl = projectSignals.audioAssetUrl;
@@ -179,6 +210,146 @@ export const VideoPreview: Component = () => {
       }
     }
   }
+
+  function stepFrame(deltaFrames: number) {
+    const fps = activeFps();
+    const currentF = Math.round(timelineSignals.currentTime() * fps);
+    const targetF = Math.max(0, Math.min(Math.round(totalDuration() * fps), currentF + deltaFrames));
+    const newTime = targetF / fps;
+    timelineSignals.setCurrentTime(newTime);
+    if (videoRef) {
+      videoRef.currentTime = newTime;
+    }
+    if (audioRef && audioUrl()) {
+      const targetAudioTime = newTime + audioOffsetMs() / 1000;
+      if (targetAudioTime >= 0) {
+        audioRef.currentTime = targetAudioTime;
+      }
+    }
+  }
+
+  function handleStartDrag(
+    zone: "top" | "bottom" | "pan",
+    mode: DragMode,
+    e: MouseEvent
+  ) {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!overlayContainerRef) return;
+    const rect = overlayContainerRef.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+
+    setActiveZone(zone);
+    const currentRegion =
+      zone === "top" ? topRegion() : zone === "bottom" ? bottomRegion() : cropRegion();
+
+    setActiveDrag({
+      zone,
+      mode,
+      startMouseX: e.clientX,
+      startMouseY: e.clientY,
+      initialRegion: { ...currentRegion },
+      containerWidth: rect.width,
+      containerHeight: rect.height,
+    });
+
+    window.addEventListener("mousemove", handleDragMove);
+    window.addEventListener("mouseup", handleDragEnd);
+  }
+
+  function handleDragMove(e: MouseEvent) {
+    const drag = activeDrag();
+    if (!drag) return;
+
+    const dxPct = ((e.clientX - drag.startMouseX) / drag.containerWidth) * 100;
+    const dyPct = ((e.clientY - drag.startMouseY) / drag.containerHeight) * 100;
+
+    if (drag.zone === "pan") {
+      const panWidth = (100 * 9) / 16;
+      const maxPanX = 100 - panWidth;
+      const newX = Math.max(0, Math.min(maxPanX, drag.initialRegion.x + dxPct));
+      projectSignals.updateComposition({
+        stacking: {
+          cropRegion: {
+            ...cropRegion(),
+            x: Math.round(newX * 100) / 100,
+          },
+        },
+      });
+      return;
+    }
+
+    const init = drag.initialRegion;
+    let newX = init.x;
+    let newY = init.y;
+    let newW = init.width;
+    let newH = init.height;
+
+    if (drag.mode === "move") {
+      newX = Math.max(0, Math.min(100 - init.width, init.x + dxPct));
+      newY = Math.max(0, Math.min(100 - init.height, init.y + dyPct));
+    } else if (drag.mode === "resize-se") {
+      newW = Math.max(5, Math.min(100 - init.x, init.width + dxPct));
+      newH = Math.max(5, Math.min(100 - init.y, init.height + dyPct));
+    } else if (drag.mode === "resize-e") {
+      newW = Math.max(5, Math.min(100 - init.x, init.width + dxPct));
+    } else if (drag.mode === "resize-s") {
+      newH = Math.max(5, Math.min(100 - init.y, init.height + dyPct));
+    } else if (drag.mode === "resize-w") {
+      const targetX = Math.max(0, Math.min(init.x + init.width - 5, init.x + dxPct));
+      newW = init.width + (init.x - targetX);
+      newX = targetX;
+    } else if (drag.mode === "resize-n") {
+      const targetY = Math.max(0, Math.min(init.y + init.height - 5, init.y + dyPct));
+      newH = init.height + (init.y - targetY);
+      newY = targetY;
+    } else if (drag.mode === "resize-nw") {
+      const targetX = Math.max(0, Math.min(init.x + init.width - 5, init.x + dxPct));
+      const targetY = Math.max(0, Math.min(init.y + init.height - 5, init.y + dyPct));
+      newW = init.width + (init.x - targetX);
+      newH = init.height + (init.y - targetY);
+      newX = targetX;
+      newY = targetY;
+    } else if (drag.mode === "resize-ne") {
+      const targetY = Math.max(0, Math.min(init.y + init.height - 5, init.y + dyPct));
+      newW = Math.max(5, Math.min(100 - init.x, init.width + dxPct));
+      newH = init.height + (init.y - targetY);
+      newY = targetY;
+    } else if (drag.mode === "resize-sw") {
+      const targetX = Math.max(0, Math.min(init.x + init.width - 5, init.x + dxPct));
+      newW = init.width + (init.x - targetX);
+      newH = Math.max(5, Math.min(100 - init.y, init.height + dyPct));
+      newX = targetX;
+    }
+
+    const updatedRegion: CropRegion = {
+      x: Math.round(newX * 10) / 10,
+      y: Math.round(newY * 10) / 10,
+      width: Math.round(newW * 10) / 10,
+      height: Math.round(newH * 10) / 10,
+    };
+
+    if (drag.zone === "top") {
+      projectSignals.updateComposition({
+        stacking: { topRegion: updatedRegion },
+      });
+    } else if (drag.zone === "bottom") {
+      projectSignals.updateComposition({
+        stacking: { bottomRegion: updatedRegion },
+      });
+    }
+  }
+
+  function handleDragEnd() {
+    setActiveDrag(null);
+    window.removeEventListener("mousemove", handleDragMove);
+    window.removeEventListener("mouseup", handleDragEnd);
+  }
+
+  onCleanup(() => {
+    window.removeEventListener("mousemove", handleDragMove);
+    window.removeEventListener("mouseup", handleDragEnd);
+  });
 
   function setTemplate(template: FramingTemplate) {
     projectSignals.updateComposition({
@@ -605,13 +776,16 @@ export const VideoPreview: Component = () => {
 
             {/* Interactive Bounding Boxes Overlay for Stacking */}
             <Show when={showCropControls() && currentTemplate() !== "blur_fill"}>
-              <div class="absolute inset-0 pointer-events-none z-20">
+              <div
+                ref={overlayContainerRef}
+                class="absolute inset-0 pointer-events-none z-20"
+              >
                 {/* Template: Stacked Split (Cam + Game) */}
                 <Show when={currentTemplate() === "stacked_split" || currentTemplate() === "split_50_50"}>
                   {/* Top Zone: Facecam */}
                   <div
-                    class={`absolute border-2 border-cyan-400 bg-cyan-500/15 pointer-events-auto transition-all ${
-                      activeZone() === "top" ? "ring-2 ring-cyan-300 shadow-lg" : "opacity-80"
+                    class={`absolute border-2 border-cyan-400 bg-cyan-500/15 pointer-events-auto cursor-move select-none transition-shadow ${
+                      activeZone() === "top" ? "ring-2 ring-cyan-300 shadow-xl z-20" : "opacity-80 z-10"
                     }`}
                     style={{
                       left: `${topRegion().x}%`,
@@ -619,20 +793,66 @@ export const VideoPreview: Component = () => {
                       width: `${topRegion().width}%`,
                       height: `${topRegion().height}%`,
                     }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveZone("top");
-                    }}
+                    onMouseDown={(e) => handleStartDrag("top", "move", e)}
                   >
-                    <div class="absolute -top-5 left-0 px-1.5 py-0.2 bg-cyan-500 text-black font-mono font-bold text-[9px] uppercase tracking-wider rounded-t">
-                      ZONE A: CAM / TOP ({topHeightPct()}%)
+                    {/* Header Label & Live Stats */}
+                    <div class="absolute -top-5 left-0 px-1.5 py-0.5 bg-cyan-500 text-black font-mono font-bold text-[9px] uppercase tracking-wider rounded-t flex items-center gap-1.5 whitespace-nowrap shadow-sm">
+                      <span>ZONE A: CAM / TOP ({topHeightPct()}%)</span>
+                      <span class="opacity-80 font-normal">
+                        [{topRegion().x.toFixed(0)}%, {topRegion().y.toFixed(0)}%, {topRegion().width.toFixed(0)}%×{topRegion().height.toFixed(0)}%]
+                      </span>
                     </div>
+
+                    {/* Resize Handles (Corner & Edge) */}
+                    <Show when={activeZone() === "top"}>
+                      <div
+                        class="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-cyan-900 rounded-sm cursor-nwse-resize shadow-md hover:scale-125 transition-transform"
+                        title="Resize Top-Left"
+                        onMouseDown={(e) => handleStartDrag("top", "resize-nw", e)}
+                      />
+                      <div
+                        class="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border border-cyan-900 rounded-sm cursor-nesw-resize shadow-md hover:scale-125 transition-transform"
+                        title="Resize Top-Right"
+                        onMouseDown={(e) => handleStartDrag("top", "resize-ne", e)}
+                      />
+                      <div
+                        class="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border border-cyan-900 rounded-sm cursor-nesw-resize shadow-md hover:scale-125 transition-transform"
+                        title="Resize Bottom-Left"
+                        onMouseDown={(e) => handleStartDrag("top", "resize-sw", e)}
+                      />
+                      <div
+                        class="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border border-cyan-900 rounded-sm cursor-nwse-resize shadow-md hover:scale-125 transition-transform"
+                        title="Resize Bottom-Right (Freeform W/H)"
+                        onMouseDown={(e) => handleStartDrag("top", "resize-se", e)}
+                      />
+
+                      <div
+                        class="absolute top-1/2 -right-1 -translate-y-1/2 w-2 h-6 bg-cyan-300 border border-cyan-900 rounded-full cursor-ew-resize shadow-md hover:scale-125 transition-transform"
+                        title="Resize Width (Right)"
+                        onMouseDown={(e) => handleStartDrag("top", "resize-e", e)}
+                      />
+                      <div
+                        class="absolute -bottom-1 left-1/2 -translate-x-1/2 h-2 w-6 bg-cyan-300 border border-cyan-900 rounded-full cursor-ns-resize shadow-md hover:scale-125 transition-transform"
+                        title="Resize Height (Bottom)"
+                        onMouseDown={(e) => handleStartDrag("top", "resize-s", e)}
+                      />
+                      <div
+                        class="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-6 bg-cyan-300 border border-cyan-900 rounded-full cursor-ew-resize shadow-md hover:scale-125 transition-transform"
+                        title="Resize Width (Left)"
+                        onMouseDown={(e) => handleStartDrag("top", "resize-w", e)}
+                      />
+                      <div
+                        class="absolute -top-1 left-1/2 -translate-x-1/2 h-2 w-6 bg-cyan-300 border border-cyan-900 rounded-full cursor-ns-resize shadow-md hover:scale-125 transition-transform"
+                        title="Resize Height (Top)"
+                        onMouseDown={(e) => handleStartDrag("top", "resize-n", e)}
+                      />
+                    </Show>
                   </div>
 
                   {/* Bottom Zone: Gameplay / Screen */}
                   <div
-                    class={`absolute border-2 border-amber-400 bg-amber-500/15 pointer-events-auto transition-all ${
-                      activeZone() === "bottom" ? "ring-2 ring-amber-300 shadow-lg" : "opacity-80"
+                    class={`absolute border-2 border-amber-400 bg-amber-500/15 pointer-events-auto cursor-move select-none transition-shadow ${
+                      activeZone() === "bottom" ? "ring-2 ring-amber-300 shadow-xl z-20" : "opacity-80 z-10"
                     }`}
                     style={{
                       left: `${bottomRegion().x}%`,
@@ -640,32 +860,84 @@ export const VideoPreview: Component = () => {
                       width: `${bottomRegion().width}%`,
                       height: `${bottomRegion().height}%`,
                     }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveZone("bottom");
-                    }}
+                    onMouseDown={(e) => handleStartDrag("bottom", "move", e)}
                   >
-                    <div class="absolute -top-5 left-0 px-1.5 py-0.2 bg-amber-500 text-black font-mono font-bold text-[9px] uppercase tracking-wider rounded-t">
-                      ZONE B: GAME / ACTION ({100 - topHeightPct()}%)
+                    {/* Header Label & Live Stats */}
+                    <div class="absolute -top-5 left-0 px-1.5 py-0.5 bg-amber-500 text-black font-mono font-bold text-[9px] uppercase tracking-wider rounded-t flex items-center gap-1.5 whitespace-nowrap shadow-sm">
+                      <span>ZONE B: GAME / ACTION ({100 - topHeightPct()}%)</span>
+                      <span class="opacity-80 font-normal">
+                        [{bottomRegion().x.toFixed(0)}%, {bottomRegion().y.toFixed(0)}%, {bottomRegion().width.toFixed(0)}%×{bottomRegion().height.toFixed(0)}%]
+                      </span>
                     </div>
+
+                    {/* Resize Handles (Corner & Edge) */}
+                    <Show when={activeZone() === "bottom"}>
+                      <div
+                        class="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-amber-900 rounded-sm cursor-nwse-resize shadow-md hover:scale-125 transition-transform"
+                        title="Resize Top-Left"
+                        onMouseDown={(e) => handleStartDrag("bottom", "resize-nw", e)}
+                      />
+                      <div
+                        class="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border border-amber-900 rounded-sm cursor-nesw-resize shadow-md hover:scale-125 transition-transform"
+                        title="Resize Top-Right"
+                        onMouseDown={(e) => handleStartDrag("bottom", "resize-ne", e)}
+                      />
+                      <div
+                        class="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border border-amber-900 rounded-sm cursor-nesw-resize shadow-md hover:scale-125 transition-transform"
+                        title="Resize Bottom-Left"
+                        onMouseDown={(e) => handleStartDrag("bottom", "resize-sw", e)}
+                      />
+                      <div
+                        class="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border border-amber-900 rounded-sm cursor-nwse-resize shadow-md hover:scale-125 transition-transform"
+                        title="Resize Bottom-Right (Freeform W/H)"
+                        onMouseDown={(e) => handleStartDrag("bottom", "resize-se", e)}
+                      />
+
+                      <div
+                        class="absolute top-1/2 -right-1 -translate-y-1/2 w-2 h-6 bg-amber-300 border border-amber-900 rounded-full cursor-ew-resize shadow-md hover:scale-125 transition-transform"
+                        title="Resize Width (Right)"
+                        onMouseDown={(e) => handleStartDrag("bottom", "resize-e", e)}
+                      />
+                      <div
+                        class="absolute -bottom-1 left-1/2 -translate-x-1/2 h-2 w-6 bg-amber-300 border border-amber-900 rounded-full cursor-ns-resize shadow-md hover:scale-125 transition-transform"
+                        title="Resize Height (Bottom)"
+                        onMouseDown={(e) => handleStartDrag("bottom", "resize-s", e)}
+                      />
+                      <div
+                        class="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-6 bg-amber-300 border border-amber-900 rounded-full cursor-ew-resize shadow-md hover:scale-125 transition-transform"
+                        title="Resize Width (Left)"
+                        onMouseDown={(e) => handleStartDrag("bottom", "resize-w", e)}
+                      />
+                      <div
+                        class="absolute -top-1 left-1/2 -translate-x-1/2 h-2 w-6 bg-amber-300 border border-amber-900 rounded-full cursor-ns-resize shadow-md hover:scale-125 transition-transform"
+                        title="Resize Height (Top)"
+                        onMouseDown={(e) => handleStartDrag("bottom", "resize-n", e)}
+                      />
+                    </Show>
                   </div>
                 </Show>
 
                 {/* Template: Pan & Scan 9:16 Window */}
                 <Show when={currentTemplate() === "pan_scan"}>
                   <div
-                    class="absolute top-0 bottom-0 border-2 border-purple-400 bg-purple-500/15 pointer-events-auto transition-all shadow-xl"
+                    class="absolute top-0 bottom-0 border-2 border-purple-400 bg-purple-500/15 pointer-events-auto cursor-ew-resize transition-all shadow-xl select-none"
                     style={{
                       left: `${cropRegion().x}%`,
                       width: `${(100 * 9) / 16}%`,
                     }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveZone("pan");
-                    }}
+                    onMouseDown={(e) => handleStartDrag("pan", "move", e)}
                   >
-                    <div class="absolute top-2 left-2 px-1.5 py-0.5 bg-purple-500 text-white font-mono font-bold text-[9px] uppercase tracking-wider rounded">
-                      9:16 CROP FOCUS
+                    <div class="absolute top-2 left-2 px-1.5 py-0.5 bg-purple-500 text-white font-mono font-bold text-[9px] uppercase tracking-wider rounded flex items-center gap-1.5 shadow-sm">
+                      <span>9:16 CROP FOCUS</span>
+                      <span class="opacity-80 font-normal">[{cropRegion().x.toFixed(1)}%]</span>
+                    </div>
+
+                    {/* Grip Handles on Edges */}
+                    <div class="absolute top-1/2 -left-1.5 -translate-y-1/2 w-3 h-12 bg-purple-400 rounded-full border border-purple-900 shadow-md flex items-center justify-center">
+                      <div class="w-0.5 h-6 bg-white/70" />
+                    </div>
+                    <div class="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-12 bg-purple-400 rounded-full border border-purple-900 shadow-md flex items-center justify-center">
+                      <div class="w-0.5 h-6 bg-white/70" />
                     </div>
                   </div>
                 </Show>
@@ -835,15 +1107,24 @@ export const VideoPreview: Component = () => {
 
       {/* Docked Studio Transport Control Bar */}
       <div class="h-11 px-4 border-t border-zinc-800/80 bg-zinc-900/80 flex items-center justify-between shrink-0 select-none">
-        {/* Left: Step Frame + Play/Pause */}
+        {/* Left: Step Frame (1f) + Step (1s) + Play/Pause */}
         <div class="flex items-center gap-1">
           <button
             type="button"
             onClick={() => stepTime(-1)}
             class="w-7 h-7 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 flex items-center justify-center cursor-pointer transition"
-            title="Step back 1s (Left Arrow)"
+            title="Step back 1s (Shift+Left)"
           >
             <SkipBack size={13} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => stepFrame(-1)}
+            class="w-6 h-7 rounded hover:bg-zinc-800 text-zinc-400 hover:text-amber-400 text-[10px] font-mono font-bold flex items-center justify-center cursor-pointer transition"
+            title="Step back 1 Frame (Left Arrow)"
+          >
+            -1f
           </button>
 
           <button
@@ -859,22 +1140,34 @@ export const VideoPreview: Component = () => {
 
           <button
             type="button"
+            onClick={() => stepFrame(1)}
+            class="w-6 h-7 rounded hover:bg-zinc-800 text-zinc-400 hover:text-amber-400 text-[10px] font-mono font-bold flex items-center justify-center cursor-pointer transition"
+            title="Step forward 1 Frame (Right Arrow)"
+          >
+            +1f
+          </button>
+
+          <button
+            type="button"
             onClick={() => stepTime(1)}
             class="w-7 h-7 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 flex items-center justify-center cursor-pointer transition"
-            title="Step forward 1s (Right Arrow)"
+            title="Step forward 1s (Shift+Right)"
           >
             <SkipForward size={13} />
           </button>
         </div>
 
-        {/* Center: Monospaced Precision Timecode */}
+        {/* Center: DaVinci Resolve Monospaced Precision Timecode */}
         <div class="flex items-center gap-2 font-mono text-xs">
-          <span class="text-zinc-100 font-semibold tabular-nums text-sm">
-            {formatTime(timelineSignals.currentTime())}
+          <span class="text-amber-400 font-bold tabular-nums text-sm tracking-wider">
+            {timelineSignals.formatSmpteTimecode(timelineSignals.currentTime(), activeFps())}
           </span>
           <span class="text-zinc-600">/</span>
           <span class="text-zinc-400 tabular-nums">
-            {formatTime(totalDuration())}
+            {timelineSignals.formatSmpteTimecode(totalDuration(), activeFps())}
+          </span>
+          <span class="text-[9px] px-1 py-0.2 rounded bg-zinc-800 text-zinc-400 font-bold">
+            {activeFps()} FPS
           </span>
         </div>
 

@@ -12,6 +12,38 @@ export const [zoomLevel, setZoomLevel] = createSignal(1.0);
 export const [isTimelineExpanded, setIsTimelineExpanded] = createSignal(false);
 export const [isVerticalSimulated, setIsVerticalSimulated] = createSignal(true);
 export const [previewViewMode, setPreviewViewMode] = createSignal<PreviewViewMode>("dual");
+export const [timelineFps, setTimelineFps] = createSignal<number>(60);
+
+export function snapToFrame(seconds: number, fps: number = timelineFps()): number {
+  const validFps = fps > 0 ? fps : 60;
+  const frame = Math.round(seconds * validFps);
+  return Math.max(0, frame / validFps);
+}
+
+export function timeToFrames(seconds: number, fps: number = timelineFps()): number {
+  const validFps = fps > 0 ? fps : 60;
+  return Math.max(0, Math.round(seconds * validFps));
+}
+
+export function formatSmpteTimecode(seconds: number, fps: number = timelineFps()): string {
+  if (!isFinite(seconds) || seconds < 0) seconds = 0;
+  const validFps = fps > 0 ? fps : 60;
+  const intFps = Math.max(1, Math.round(validFps));
+  const totalFrames = Math.round(seconds * validFps);
+  const f = totalFrames % intFps;
+  const totalSecs = Math.floor(totalFrames / intFps);
+  const s = totalSecs % 60;
+  const m = Math.floor((totalSecs % 3600) / 60);
+  const h = Math.floor(totalSecs / 3600);
+  return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}:${f.toString().padStart(2, "0")}`;
+}
+
+export function stepFrame(deltaFrames: number) {
+  const fps = timelineFps();
+  const currentF = Math.round(currentTime() * fps);
+  const targetF = Math.max(0, currentF + deltaFrames);
+  setCurrentTime(targetF / fps);
+}
 
 export const hasSelectionRange = createMemo(() => {
   const inp = inPoint();
@@ -130,5 +162,11 @@ export const timelineSignals = {
   zoomOut,
   resetZoom,
   toggleTimelineExpanded,
-  toggleVerticalSimulated
+  toggleVerticalSimulated,
+  timelineFps,
+  setTimelineFps,
+  snapToFrame,
+  timeToFrames,
+  formatSmpteTimecode,
+  stepFrame
 };

@@ -70,6 +70,57 @@ export const TimelineScrubber: Component = () => {
     return Math.min(100, Math.max(0, (masterOut / dur) * 100));
   });
 
+  const activeFps = createMemo(() => {
+    const vFps = projectSignals.videoMetadata()?.fps;
+    if (vFps && vFps > 0) return Math.round(vFps);
+    const pFps = projectSignals.currentProject()?.export.frameRate;
+    if (pFps && pFps > 0) return Math.round(pFps);
+    return timelineSignals.timelineFps() || 60;
+  });
+
+  createEffect(() => {
+    const fps = activeFps();
+    if (fps > 0) {
+      timelineSignals.setTimelineFps(fps);
+    }
+  });
+
+  // DaVinci Resolve style keyboard frame navigation
+  createEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const activeEl = document.activeElement;
+      if (
+        activeEl instanceof HTMLInputElement ||
+        activeEl instanceof HTMLTextAreaElement ||
+        activeEl instanceof HTMLSelectElement
+      ) {
+        return;
+      }
+
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        const step = e.shiftKey ? Math.round(activeFps()) : 1;
+        timelineSignals.stepFrame(-step);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        const step = e.shiftKey ? Math.round(activeFps()) : 1;
+        timelineSignals.stepFrame(step);
+      } else if (e.key === " " && !e.ctrlKey) {
+        e.preventDefault();
+        timelineSignals.togglePlay();
+      } else if (e.key.toLowerCase() === "i" && !e.ctrlKey) {
+        e.preventDefault();
+        timelineSignals.setInPoint();
+      } else if (e.key.toLowerCase() === "o" && !e.ctrlKey) {
+        e.preventDefault();
+        timelineSignals.setOutPoint();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
+  });
+
   const isIntroTrimmed = projectSignals.isIntroTrimmed;
   const isOutroTrimmed = projectSignals.isOutroTrimmed;
 
@@ -84,10 +135,7 @@ export const TimelineScrubber: Component = () => {
   }
 
   function formatPreciseTime(seconds: number): string {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    const ms = Math.floor((seconds % 1) * 10);
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}.${ms}`;
+    return timelineSignals.formatSmpteTimecode(seconds, activeFps());
   }
 
   function calculateTimeFromEvent(e: MouseEvent): number {
@@ -95,7 +143,8 @@ export const TimelineScrubber: Component = () => {
     const rect = timelineTrackRef.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const ratio = Math.max(0, Math.min(1, clickX / rect.width));
-    return ratio * totalDuration();
+    const rawTime = ratio * totalDuration();
+    return timelineSignals.snapToFrame(rawTime, activeFps());
   }
 
   function handleTrackClick(e: MouseEvent) {
@@ -440,9 +489,53 @@ export const TimelineScrubber: Component = () => {
             </button>
           </div>
 
-          <span class="text-[11px] font-mono text-zinc-400 px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 tabular-nums">
-            Playhead: <strong class="text-zinc-100">{formatPreciseTime(timelineSignals.currentTime())}</strong>
-          </span>
+          {/* DaVinci Resolve Digital Timecode HUD */}
+          <div class="flex items-center gap-2 bg-zinc-950 px-2.5 py-0.5 rounded-lg border border-zinc-800 shadow-inner select-none">
+            <div class="flex items-center gap-1 font-mono">
+              <span class="text-[9px] text-amber-500/80 font-bold uppercase tracking-wider">TC</span>
+              <span class="font-bold text-amber-400 tracking-wider text-xs tabular-nums">
+                {timelineSignals.formatSmpteTimecode(timelineSignals.currentTime(), activeFps())}
+              </span>
+            </div>
+
+            <div class="h-3 w-px bg-zinc-800" />
+
+            {/* Frame Stepping buttons */}
+            <div class="flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={() => timelineSignals.stepFrame(-1)}
+                class="w-4 h-4 flex items-center justify-center rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white text-[9px] font-mono transition cursor-pointer"
+                title="Previous Frame (Left Arrow)"
+              >
+                ◀
+              </button>
+              <button
+                type="button"
+                onClick={() => timelineSignals.stepFrame(1)}
+                class="w-4 h-4 flex items-center justify-center rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white text-[9px] font-mono transition cursor-pointer"
+                title="Next Frame (Right Arrow)"
+              >
+                ▶
+              </button>
+            </div>
+
+            <div class="h-3 w-px bg-zinc-800" />
+
+            <div class="flex items-center gap-1 text-[10px] font-mono text-zinc-400 tabular-nums">
+              <span>Frame:</span>
+              <strong class="text-zinc-200">
+                {timelineSignals.timeToFrames(timelineSignals.currentTime(), activeFps()).toLocaleString()}
+              </strong>
+              <span class="text-zinc-600">/</span>
+              <span class="text-zinc-500">
+                {timelineSignals.timeToFrames(totalDuration(), activeFps()).toLocaleString()}
+              </span>
+              <span class="px-1 py-0.2 rounded bg-zinc-900 border border-zinc-800 text-amber-300 text-[8px] font-bold">
+                {activeFps()} FPS
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Center: Trimming, Split & History Controls */}
