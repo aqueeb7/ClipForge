@@ -352,7 +352,8 @@ pub fn execute_render_task(
         },
         "stacked_split" | "split_50_50" => {
             let top_pct = req.top_height_pct.unwrap_or(if req.mode == "split_50_50" { 50.0 } else { 35.0 });
-            let top_h = (((height as f64) * (top_pct / 100.0)).round() as u32).max(100).min(height - 100);
+            let raw_top_h = (((height as f64) * (top_pct / 100.0)).round() as u32).max(100).min(height - 100);
+            let top_h = (raw_top_h / 2) * 2;
             let bot_h = height - top_h;
 
             let tx = req.top_crop_x.unwrap_or(2.0) / 100.0;
@@ -375,10 +376,10 @@ pub fn execute_render_task(
         "pan_scan" => {
             let px = (req.pan_crop_x.unwrap_or(21.875) / 100.0).clamp(0.0, 0.4375);
             format!(
-                "[0:v]crop=in_h*9/16:in_h:in_w*{px:.4}:0,scale={width}:{height}{overlay_chain},setsar=1,format=yuv420p[vout]"
+                "[0:v]crop=trunc(in_h*9/32)*2:in_h:trunc(in_w*{px:.4}/2)*2:0,scale={width}:{height}{overlay_chain},setsar=1,format=yuv420p[vout]"
             )
         },
-        _ => format!(
+        "blur_fill" | "blur" | _ => format!(
             "[0:v]split=2[bg_in][fg_in];\
              [bg_in]scale=270:480:force_original_aspect_ratio=increase,crop=270:480,boxblur=8:2,scale={}:{}:flags=bicubic,eq=brightness=-0.15[bg];\
              [fg_in]scale={}:{}:force_original_aspect_ratio=decrease[fg];\

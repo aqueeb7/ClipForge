@@ -1,6 +1,6 @@
 import { createSignal, createMemo } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
-import type { Clip, ClipForgeProject } from "../types/index.js";
+import type { Clip, ClipForgeProject, FramingTemplate, StackingSettings } from "../types/index.js";
 import {
   renderClip,
   openInExplorer,
@@ -25,6 +25,8 @@ export interface QueueItem {
   eta: string;
   fileSizeBytes: number;
   error?: string;
+  framingTemplate?: FramingTemplate;
+  stacking?: StackingSettings;
 }
 
 export interface RenderedClipInfo {
@@ -40,6 +42,77 @@ export function sanitizeCleanPath(p: string): string {
     .replace(/[\\/]apps[\\/]Exports[\\/]/gi, "/Exports/")
     .replace(/[\\/]apps[\\/]/gi, "/")
     .replace(/\\/g, "/");
+}
+
+export function resolveClipFraming(
+  item: {
+    id: string;
+    title?: string;
+    framingTemplate?: FramingTemplate;
+    stacking?: StackingSettings;
+  },
+  project: ClipForgeProject
+) {
+  const matchingShort = project.shorts?.find((s) => s.id === item.id);
+  const isShort = Boolean(
+    matchingShort ||
+    item.id.startsWith("short_") ||
+    item.title?.toLowerCase().includes("short")
+  );
+
+  const manualClips = project.clipSettings.mode === "manual" ? project.clipSettings.clips : undefined;
+  const matchingManual = manualClips?.find((m: any) => m.id === item.id);
+
+  let template: string | undefined =
+    item.framingTemplate ||
+    item.stacking?.template ||
+    matchingShort?.framingTemplate ||
+    matchingShort?.stacking?.template ||
+    matchingManual?.framingTemplate ||
+    matchingManual?.stacking?.template ||
+    project.composition.stacking?.template;
+
+  if (!template) {
+    if (project.composition.gameplay?.mode === "cover") {
+      template = "crop";
+    } else if (project.composition.background?.mode === "solid") {
+      template = "solid";
+    } else {
+      template = "blur_fill";
+    }
+  }
+
+  const stacking =
+    item.stacking ||
+    matchingShort?.stacking ||
+    matchingManual?.stacking ||
+    project.composition.stacking || {
+      template: template as any,
+      topHeightPercent: template === "split_50_50" ? 50 : 35,
+      topRegion: { x: 2, y: 5, width: 28, height: 35 },
+      bottomRegion: { x: 0, y: 15, width: 100, height: 85 },
+      cropRegion: { x: 21.875, y: 0, width: 56.25, height: 100 }
+    };
+
+  const tr = stacking.topRegion ?? { x: 2, y: 5, width: 28, height: 35 };
+  const br = stacking.bottomRegion ?? { x: 0, y: 15, width: 100, height: 85 };
+  const cr = stacking.cropRegion ?? { x: 21.875, y: 0, width: 56.25, height: 100 };
+  const topHeightPct = stacking.topHeightPercent ?? (template === "split_50_50" ? 50 : 35);
+
+  return {
+    isShort,
+    mode: template,
+    top_crop_x: tr.x,
+    top_crop_y: tr.y,
+    top_crop_w: tr.width,
+    top_crop_h: tr.height,
+    bot_crop_x: br.x,
+    bot_crop_y: br.y,
+    bot_crop_w: br.width,
+    bot_crop_h: br.height,
+    pan_crop_x: cr.x,
+    top_height_pct: topHeightPct
+  };
 }
 
 function loadPersistedQueueItems(): QueueItem[] {
@@ -160,7 +233,9 @@ export function initQueueFromManifest(clips: Clip[], project?: ClipForgeProject)
       fps: 0,
       speed: "0x",
       eta: "--:--",
-      fileSizeBytes: 0
+      fileSizeBytes: 0,
+      framingTemplate: clip.framingTemplate,
+      stacking: clip.stacking
     };
   });
 
@@ -216,15 +291,8 @@ export async function runExportQueue(project: ClipForgeProject) {
       setQueueItems(i, "status", "rendering");
       setQueueItems(i, "progress", 0);
 
-      const bgMode = project.composition.background.mode;
-      const gameplayMode = project.composition.gameplay.mode;
-      const effectiveMode = gameplayMode === "cover" ? "crop" : bgMode;
-
-      const isShort = Boolean(
-        project.shorts?.some((s) => s.id === item.id) ||
-        item.id.startsWith("short_") ||
-        item.title.toLowerCase().includes("short")
-      );
+      const framing = resolveClipFraming(item, project);
+      const isShort = framing.isShort;
       const overlayEnabled = isShort ? false : (project.composition.overlay?.enabled ?? true);
 
       try {
@@ -236,14 +304,24 @@ export async function runExportQueue(project: ClipForgeProject) {
           start_seconds: item.startSeconds,
           duration_seconds: item.durationSeconds,
           output_path: item.outputPath,
-          mode: effectiveMode,
+          mode: framing.mode,
           bg_color: project.composition.background.color,
           crf: project.export.crf,
           preset: project.export.preset,
           overlay_enabled: overlayEnabled,
           brand_title: isShort ? undefined : (project.composition.overlay?.brandTitle || "CLYPTIK"),
           episode_label: isShort ? undefined : (project.composition.overlay?.episodeLabel || "PART"),
-          episode_index: isShort ? undefined : item.episodeIndex
+          episode_index: isShort ? undefined : item.episodeIndex,
+          top_crop_x: framing.top_crop_x,
+          top_crop_y: framing.top_crop_y,
+          top_crop_w: framing.top_crop_w,
+          top_crop_h: framing.top_crop_h,
+          bot_crop_x: framing.bot_crop_x,
+          bot_crop_y: framing.bot_crop_y,
+          bot_crop_w: framing.bot_crop_w,
+          bot_crop_h: framing.bot_crop_h,
+          pan_crop_x: framing.pan_crop_x,
+          top_height_pct: framing.top_height_pct
         });
 
         if (res.success) {
@@ -299,7 +377,9 @@ export async function renderSingleClip(clip: Clip, project: ClipForgeProject) {
       fps: 0,
       speed: "0x",
       eta: "--:--",
-      fileSizeBytes: 0
+      fileSizeBytes: 0,
+      framingTemplate: clip.framingTemplate,
+      stacking: clip.stacking
     };
     setQueueItems([...queueItems, newItem]);
     idx = queueItems.length - 1;
@@ -310,15 +390,17 @@ export async function renderSingleClip(clip: Clip, project: ClipForgeProject) {
       error: undefined,
       fps: 0,
       speed: "0x",
-      eta: "--:--"
+      eta: "--:--",
+      framingTemplate: clip.framingTemplate ?? queueItems[idx]?.framingTemplate,
+      stacking: clip.stacking ?? queueItems[idx]?.stacking
     });
   }
 
   setSingleRenderingClipId(clip.id);
 
-  const bgMode = project.composition.background.mode;
-  const gameplayMode = project.composition.gameplay.mode;
-  const effectiveMode = gameplayMode === "cover" ? "crop" : bgMode;
+  const framing = resolveClipFraming(clip, project);
+  const isShort = framing.isShort;
+  const overlayEnabled = isShort ? false : (project.composition.overlay?.enabled ?? true);
 
   let unlisten: (() => void) | null = null;
   try {
@@ -340,13 +422,6 @@ export async function renderSingleClip(clip: Clip, project: ClipForgeProject) {
       }
     });
 
-    const isShort = Boolean(
-      project.shorts?.some((s) => s.id === clip.id) ||
-      clip.id.startsWith("short_") ||
-      clip.title.toLowerCase().includes("short")
-    );
-    const overlayEnabled = isShort ? false : (project.composition.overlay?.enabled ?? true);
-
     const item = queueItems[idx];
     const res = await renderClip({
       clip_id: item.id,
@@ -356,14 +431,24 @@ export async function renderSingleClip(clip: Clip, project: ClipForgeProject) {
       start_seconds: item.startSeconds,
       duration_seconds: item.durationSeconds,
       output_path: item.outputPath,
-      mode: effectiveMode,
+      mode: framing.mode,
       bg_color: project.composition.background.color,
       crf: project.export.crf,
       preset: project.export.preset,
       overlay_enabled: overlayEnabled,
       brand_title: isShort ? undefined : (project.composition.overlay?.brandTitle || "CLYPTIK"),
       episode_label: isShort ? undefined : (project.composition.overlay?.episodeLabel || "PART"),
-      episode_index: isShort ? undefined : item.episodeIndex
+      episode_index: isShort ? undefined : item.episodeIndex,
+      top_crop_x: framing.top_crop_x,
+      top_crop_y: framing.top_crop_y,
+      top_crop_w: framing.top_crop_w,
+      top_crop_h: framing.top_crop_h,
+      bot_crop_x: framing.bot_crop_x,
+      bot_crop_y: framing.bot_crop_y,
+      bot_crop_w: framing.bot_crop_w,
+      bot_crop_h: framing.bot_crop_h,
+      pan_crop_x: framing.pan_crop_x,
+      top_height_pct: framing.top_height_pct
     });
 
     if (res.success) {

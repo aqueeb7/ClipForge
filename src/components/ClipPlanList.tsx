@@ -99,7 +99,9 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
       outputName: `${projName.replace(/\s+/g, "_")}_Short_${index + 1}.mp4`,
       title: short.title || `Short #${index + 1}`,
       enabled: true,
-      status: "pending"
+      status: "pending",
+      framingTemplate: short.framingTemplate,
+      stacking: short.stacking
     };
   }
 
@@ -596,9 +598,32 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                       </div>
                     </div>
 
-                    {/* Row 2: Clean Filename */}
-                    <div class="text-[10px] font-mono text-zinc-500 truncate pl-8" title={clip.outputName}>
-                      {clip.outputName}
+                    {/* Row 2: Template Tag + Clean Filename */}
+                    <div class="flex items-center gap-2 pl-8 text-[10px] min-w-0">
+                      <span class="font-mono uppercase px-1.5 py-0.5 rounded bg-zinc-800/80 border border-zinc-700/60 text-zinc-300 shrink-0 whitespace-nowrap">
+                        {(() => {
+                          const stacking = clip.stacking || project()?.composition?.stacking;
+                          const tmpl = clip.framingTemplate || stacking?.template || "blur_fill";
+                          switch (tmpl) {
+                            case "stacked_split":
+                              return "Cam+Game Split";
+                            case "split_50_50":
+                              return "50/50 Split";
+                            case "pan_scan":
+                              return "Pan & Scan";
+                            case "solid":
+                              return "Solid Fill";
+                            case "crop":
+                              return "Cover Crop";
+                            case "blur_fill":
+                            default:
+                              return "Blur Fill";
+                          }
+                        })()}
+                      </span>
+                      <span class="font-mono text-zinc-500 truncate" title={clip.outputName}>
+                        {clip.outputName}
+                      </span>
                     </div>
 
                     {/* Row 3: Action Buttons & Published History */}

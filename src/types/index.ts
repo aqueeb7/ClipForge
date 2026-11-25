@@ -150,6 +150,8 @@ export interface Clip {
   status: "pending" | "rendering" | "completed" | "failed";
   progress?: number;
   error?: string;
+  framingTemplate?: FramingTemplate;
+  stacking?: StackingSettings;
 }
 
 export interface ClipManifest {

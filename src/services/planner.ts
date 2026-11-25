@@ -185,7 +185,9 @@ export function generateManualClips(
       sourceEndSeconds: Math.round(item.end * 1000) / 1000,
       enabled: item.enabled ?? true,
       outputName,
-      status: "pending"
+      status: "pending",
+      framingTemplate: item.framingTemplate,
+      stacking: item.stacking
     });
   }
 
