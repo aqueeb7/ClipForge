@@ -1,8 +1,8 @@
-import { Component, createSignal, createMemo, Show, For } from "solid-js";
+import { Component, createSignal, createMemo, createEffect, Show, For } from "solid-js";
 import { projectSignals } from "../stores/project";
 import { timelineSignals } from "../stores/timeline";
-import { openFileDialog, isTauriEnvironment } from "../services/api";
-import { Sliders, Scissors, Music, Film, Plus, Trash2, Check, RefreshCw, Volume2, VolumeX, Split } from "./Icons";
+import { openFileDialog, getMediaAssetUrl, isTauriEnvironment } from "../services/api";
+import { Sliders, Scissors, Music, Film, Plus, Trash2, Check, RefreshCw, Volume2, VolumeX, Split, Image } from "./Icons";
 
 export const Inspector: Component = () => {
   const [activeTab, setActiveTab] = createSignal<"framing" | "slicing" | "audio" | "source">("framing");
@@ -13,6 +13,19 @@ export const Inspector: Component = () => {
   const composition = createMemo(() => project()?.composition);
   const clipSettings = createMemo(() => project()?.clipSettings);
   const syncSettings = createMemo(() => project()?.synchronization);
+
+  const [inspectorLogoAssetUrl, setInspectorLogoAssetUrl] = createSignal<string | null>(null);
+
+  createEffect(() => {
+    const rawPath = composition()?.overlay?.logoPath;
+    if (rawPath) {
+      getMediaAssetUrl(rawPath)
+        .then((url) => setInspectorLogoAssetUrl(url))
+        .catch(() => setInspectorLogoAssetUrl(null));
+    } else {
+      setInspectorLogoAssetUrl(null);
+    }
+  });
 
   function formatTime(seconds: number): string {
     const mins = Math.floor(seconds / 60);
@@ -475,12 +488,138 @@ export const Inspector: Component = () => {
               </div>
 
               <Show when={composition()?.overlay?.enabled ?? true}>
-                <div class="space-y-2">
+                <div class="space-y-3">
+                  {/* PNG Title Image / Logo */}
+                  <div class="space-y-1.5">
+                    <div class="flex items-center justify-between">
+                      <span class="text-[10px] text-zinc-400 font-medium">Header Title PNG Image</span>
+                      <Show when={composition()?.overlay?.logoPath}>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            projectSignals.updateComposition({
+                              overlay: {
+                                ...(composition()?.overlay || {}),
+                                enabled: true,
+                                logoPath: undefined
+                              }
+                            })
+                          }
+                          class="text-[9px] text-red-400 hover:text-red-300 cursor-pointer flex items-center gap-1 transition"
+                          title="Remove heading logo image"
+                        >
+                          <Trash2 size={10} />
+                          <span>Remove</span>
+                        </button>
+                      </Show>
+                    </div>
+
+                    <Show
+                      when={composition()?.overlay?.logoPath}
+                      fallback={
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const file = await openFileDialog({
+                              title: "Select Title PNG Image",
+                              filters: [{ name: "PNG Images (*.png)", extensions: ["png"] }]
+                            });
+                            if (file) {
+                              projectSignals.updateComposition({
+                                overlay: {
+                                  ...(composition()?.overlay || { brandTitle: "CLYPTIK", episodeLabel: "PART" }),
+                                  enabled: true,
+                                  logoPath: file,
+                                  logoScale: composition()?.overlay?.logoScale || 1.0
+                                }
+                              });
+                            }
+                          }}
+                          class="w-full py-2.5 px-3 border border-dashed border-zinc-700 hover:border-blue-500/80 rounded-lg bg-zinc-950/60 hover:bg-zinc-800/40 text-zinc-400 hover:text-zinc-200 text-xs flex items-center justify-center gap-2 cursor-pointer transition group"
+                        >
+                          <Image size={14} class="text-zinc-500 group-hover:text-blue-400 transition" />
+                          <span>Choose PNG Title Logo...</span>
+                        </button>
+                      }
+                    >
+                      <div class="p-2.5 rounded-lg bg-zinc-950 border border-zinc-800 space-y-2">
+                        <div class="flex items-center gap-2.5">
+                          <div class="w-14 h-11 rounded bg-zinc-900 border border-zinc-700/60 flex items-center justify-center p-1 overflow-hidden shrink-0">
+                            <Show
+                              when={inspectorLogoAssetUrl()}
+                              fallback={<div class="text-[9px] text-zinc-500 font-mono">PNG</div>}
+                            >
+                              <img
+                                src={inspectorLogoAssetUrl()!}
+                                alt="Heading Logo"
+                                class="max-w-full max-h-full object-contain"
+                              />
+                            </Show>
+                          </div>
+                          <div class="flex-1 min-w-0">
+                            <div class="text-[11px] font-mono text-zinc-200 truncate" title={composition()?.overlay?.logoPath}>
+                              {composition()?.overlay?.logoPath?.split(/[/\\]/).pop()}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const file = await openFileDialog({
+                                  title: "Select Title PNG Image",
+                                  filters: [{ name: "PNG Images (*.png)", extensions: ["png"] }]
+                                });
+                                if (file) {
+                                  projectSignals.updateComposition({
+                                    overlay: {
+                                      ...(composition()?.overlay || {}),
+                                      enabled: true,
+                                      logoPath: file
+                                    }
+                                  });
+                                }
+                              }}
+                              class="text-[10px] text-blue-400 hover:text-blue-300 cursor-pointer transition"
+                            >
+                              Change Image...
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Logo Scale Slider */}
+                        <div class="pt-1.5 border-t border-zinc-800/80 space-y-1">
+                          <div class="flex items-center justify-between text-[10px]">
+                            <span class="text-zinc-400">Logo Size</span>
+                            <span class="font-mono text-zinc-300 font-semibold">
+                              {Math.round((composition()?.overlay?.logoScale || 1.0) * 100)}%
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0.5"
+                            max="1.6"
+                            step="0.05"
+                            value={composition()?.overlay?.logoScale || 1.0}
+                            onInput={(e) => {
+                              const val = parseFloat((e.target as HTMLInputElement).value);
+                              projectSignals.updateComposition({
+                                overlay: {
+                                  ...(composition()?.overlay || {}),
+                                  enabled: true,
+                                  logoScale: val
+                                }
+                              });
+                            }}
+                            class="w-full accent-blue-500 cursor-pointer"
+                          />
+                        </div>
+                      </div>
+                    </Show>
+                  </div>
+
                   <div>
-                    <span class="block text-[10px] text-zinc-400 mb-1">Top Brand Badge</span>
+                    <span class="block text-[10px] text-zinc-400 mb-1">Header Brand Title (Text)</span>
                     <input
                       type="text"
-                      placeholder="e.g. CLYPTIK"
+                      placeholder="e.g. CLYPTIK (or leave empty if using PNG only)"
                       value={composition()?.overlay?.brandTitle || ""}
                       onInput={(e) => {
                         projectSignals.updateComposition({
@@ -491,7 +630,7 @@ export const Inspector: Component = () => {
                           }
                         });
                       }}
-                      class="w-full px-2.5 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-200 outline-none focus:border-zinc-700"
+                      class="w-full px-2.5 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-200 outline-none focus:border-zinc-700 placeholder:text-zinc-500"
                     />
                   </div>
 

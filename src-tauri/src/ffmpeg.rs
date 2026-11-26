@@ -290,6 +290,16 @@ pub fn execute_render_task(
         cmd.arg("-i").arg(audio);
     }
 
+    let has_logo = req.overlay_enabled.unwrap_or(true)
+        && req.logo_path.as_ref().map(|p| !p.trim().is_empty() && std::path::Path::new(p).exists()).unwrap_or(false);
+    let logo_input_idx = if has_logo {
+        let idx = if has_separate_audio { 2 } else { 1 };
+        cmd.arg("-i").arg(req.logo_path.as_ref().unwrap());
+        Some(idx)
+    } else {
+        None
+    };
+
     let width = 1080;
     let height = 1920;
 
@@ -304,9 +314,10 @@ pub fn execute_render_task(
         if let Some(ref brand) = req.brand_title {
             if !brand.trim().is_empty() {
                 let escaped_brand = escape_drawtext(&brand.trim().to_uppercase());
+                let brand_y = if has_logo { 240 } else { 120 };
                 overlay_filters.push(format!(
-                    "drawtext={}text='{}':fontcolor=white:fontsize=36:x=(w-text_w)/2:y=120:box=1:boxcolor=black@0.6:boxborderw=10",
-                    font_arg, escaped_brand
+                    "drawtext={}text='{}':fontcolor=white:fontsize=36:x=(w-text_w)/2:y={}:box=1:boxcolor=black@0.6:boxborderw=10",
+                    font_arg, escaped_brand, brand_y
                 ));
             }
         }
@@ -338,16 +349,16 @@ pub fn execute_render_task(
         String::new()
     };
 
-    let video_filter_graph = match req.mode.as_str() {
+    let base_graph = match req.mode.as_str() {
         "crop" => format!(
-            "[0:v]scale={}:{}:force_original_aspect_ratio=increase,crop={}:{}:(in_w-{})/2:(in_h-{})/2{},setsar=1,format=yuv420p[vout]",
-            width, height, width, height, width, height, overlay_chain
+            "[0:v]scale={}:{}:force_original_aspect_ratio=increase,crop={}:{}:(in_w-{})/2:(in_h-{})/2[base_v]",
+            width, height, width, height, width, height
         ),
         "solid" => {
             let color = req.bg_color.as_deref().unwrap_or("#000000");
             format!(
-                "[0:v]scale={}:{}:force_original_aspect_ratio=decrease,pad={}:{}:({}-iw)/2:({}-ih)/2:color={}{},setsar=1,format=yuv420p[vout]",
-                width, height, width, height, width, height, color, overlay_chain
+                "[0:v]scale={}:{}:force_original_aspect_ratio=decrease,pad={}:{}:({}-iw)/2:({}-ih)/2:color={}[base_v]",
+                width, height, width, height, width, height, color
             )
         },
         "stacked_split" | "split_50_50" => {
@@ -370,22 +381,39 @@ pub fn execute_render_task(
                 "[0:v]split=2[in_top][in_bot];\
                  [in_top]crop=in_w*{tw:.4}:in_h*{th:.4}:in_w*{tx:.4}:in_h*{ty:.4},scale={width}:{top_h}:force_original_aspect_ratio=increase,crop={width}:{top_h}[top];\
                  [in_bot]crop=in_w*{bw:.4}:in_h*{bh:.4}:in_w*{bx:.4}:in_h*{by:.4},scale={width}:{bot_h}:force_original_aspect_ratio=increase,crop={width}:{bot_h}[bot];\
-                 [top][bot]vstack=inputs=2{overlay_chain},setsar=1,format=yuv420p[vout]"
+                 [top][bot]vstack=inputs=2[base_v]"
             )
         },
         "pan_scan" => {
             let px = (req.pan_crop_x.unwrap_or(21.875) / 100.0).clamp(0.0, 0.4375);
             format!(
-                "[0:v]crop=trunc(in_h*9/32)*2:in_h:trunc(in_w*{px:.4}/2)*2:0,scale={width}:{height}{overlay_chain},setsar=1,format=yuv420p[vout]"
+                "[0:v]crop=trunc(in_h*9/32)*2:in_h:trunc(in_w*{px:.4}/2)*2:0,scale={width}:{height}[base_v]"
             )
         },
         "blur_fill" | "blur" | _ => format!(
             "[0:v]split=2[bg_in][fg_in];\
              [bg_in]scale=270:480:force_original_aspect_ratio=increase,crop=270:480,boxblur=8:2,scale={}:{}:flags=bicubic,eq=brightness=-0.15[bg];\
              [fg_in]scale={}:{}:force_original_aspect_ratio=decrease[fg];\
-             [bg][fg]overlay=(W-w)/2:(H-h)/2{},setsar=1,format=yuv420p[vout]",
-            width, height, width, height, overlay_chain
+             [bg][fg]overlay=(W-w)/2:(H-h)/2[base_v]",
+            width, height, width, height
         ),
+    };
+
+    let video_filter_graph = if let Some(logo_idx) = logo_input_idx {
+        let logo_y = req.logo_offset_y.unwrap_or(90);
+        let max_w = (720.0 * req.logo_scale.unwrap_or(1.0).clamp(0.3, 2.5)).round() as u32;
+        format!(
+            "{};\
+             [{}:v]scale='min({},iw)':-1:force_original_aspect_ratio=decrease[logo_s];\
+             [base_v][logo_s]overlay=(W-w)/2:{}:eof_action=repeat{},setsar=1,format=yuv420p[vout]",
+            base_graph, logo_idx, max_w, logo_y, overlay_chain
+        )
+    } else {
+        format!(
+            "{};\
+             [base_v]null{},setsar=1,format=yuv420p[vout]",
+            base_graph, overlay_chain
+        )
     };
 
     // Audio synchronization

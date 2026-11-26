@@ -41,6 +41,9 @@ export interface OverlaySettings {
   brandTitle?: string;
   episodeLabel?: string;
   showEpisodeNumber?: boolean;
+  logoPath?: string;
+  logoScale?: number;
+  logoOffsetY?: number;
 }
 
 export interface CompositionSettings {
@@ -255,6 +258,9 @@ export interface RenderClipRequest {
   bot_crop_h?: number;
   pan_crop_x?: number;
   top_height_pct?: number;
+  logo_path?: string;
+  logo_scale?: number;
+  logo_offset_y?: number;
 }
 
 export interface RenderProgressPayload {

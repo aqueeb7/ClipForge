@@ -603,7 +603,7 @@ export const ClipPlanList: Component<ClipPlanListProps> = (props) => {
                       <span class="font-mono uppercase px-1.5 py-0.5 rounded bg-zinc-800/80 border border-zinc-700/60 text-zinc-300 shrink-0 whitespace-nowrap">
                         {(() => {
                           const stacking = clip.stacking || project()?.composition?.stacking;
-                          const tmpl = clip.framingTemplate || stacking?.template || "blur_fill";
+                          const tmpl = (clip.framingTemplate || stacking?.template || "blur_fill") as string;
                           switch (tmpl) {
                             case "stacked_split":
                               return "Cam+Game Split";

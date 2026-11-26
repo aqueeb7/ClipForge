@@ -1,6 +1,7 @@
 import { Component, createSignal, createMemo, createEffect, onCleanup, Show, For } from "solid-js";
 import { projectSignals } from "../stores/project";
 import { timelineSignals, type PreviewViewMode } from "../stores/timeline";
+import { getMediaAssetUrl } from "../services/api";
 import type { FramingTemplate, CropRegion } from "../types/index.js";
 import {
   Play,
@@ -78,6 +79,19 @@ export const VideoPreview: Component = () => {
 
   const isVideoMuted = createMemo(() => isMasterMuted() || projectSignals.isVideoAudioMuted());
   const isDedicatedMuted = createMemo(() => isMasterMuted() || projectSignals.isDedicatedAudioMuted());
+
+  const [logoAssetUrl, setLogoAssetUrl] = createSignal<string | null>(null);
+
+  createEffect(() => {
+    const rawPath = composition()?.overlay?.logoPath;
+    if (rawPath) {
+      getMediaAssetUrl(rawPath)
+        .then((url) => setLogoAssetUrl(url))
+        .catch(() => setLogoAssetUrl(null));
+    } else {
+      setLogoAssetUrl(null);
+    }
+  });
 
   // Crop regions from project stacking
   const topRegion = createMemo<CropRegion>(
@@ -981,12 +995,27 @@ export const VideoPreview: Component = () => {
               </div>
             </Show>
 
-            {/* Overlays: Top Brand Title */}
-            <div class="relative z-20 pt-2 px-2 text-center pointer-events-none w-full">
-              <Show when={composition()?.overlay?.enabled && composition()?.overlay?.brandTitle}>
-                <span class="inline-block px-2 py-0.5 bg-black/80 text-white text-[9px] font-black uppercase tracking-widest rounded border border-white/20 backdrop-blur shadow-sm">
-                  {composition()?.overlay?.brandTitle}
-                </span>
+            {/* Overlays: Top Brand Title & Heading Logo */}
+            <div class="relative z-20 pt-2.5 px-3 text-center pointer-events-none w-full flex flex-col items-center gap-1">
+              <Show when={composition()?.overlay?.enabled}>
+                <Show when={composition()?.overlay?.logoPath && logoAssetUrl()}>
+                  <div class="max-w-[85%] flex items-center justify-center">
+                    <img
+                      src={logoAssetUrl()!}
+                      alt="Heading Logo"
+                      class="object-contain drop-shadow-md select-none transition-all"
+                      style={{
+                        "max-height": `${Math.round(48 * (composition()?.overlay?.logoScale || 1.0))}px`,
+                        "max-width": `${Math.round(260 * (composition()?.overlay?.logoScale || 1.0))}px`,
+                      }}
+                    />
+                  </div>
+                </Show>
+                <Show when={composition()?.overlay?.brandTitle}>
+                  <span class="inline-block px-2 py-0.5 bg-black/80 text-white text-[9px] font-black uppercase tracking-widest rounded border border-white/20 backdrop-blur shadow-sm">
+                    {composition()?.overlay?.brandTitle}
+                  </span>
+                </Show>
               </Show>
             </div>
 

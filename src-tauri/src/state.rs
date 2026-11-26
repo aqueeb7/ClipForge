@@ -55,6 +55,9 @@ pub struct RenderClipRequest {
     pub bot_crop_h: Option<f64>,
     pub pan_crop_x: Option<f64>,
     pub top_height_pct: Option<f64>,
+    pub logo_path: Option<String>,
+    pub logo_scale: Option<f64>,
+    pub logo_offset_y: Option<i64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

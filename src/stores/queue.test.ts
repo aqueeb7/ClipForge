@@ -31,6 +31,7 @@ describe("resolveClipFraming", () => {
       height: 1920,
       background: { mode: "blur" },
       gameplay: { mode: "contain" },
+      overlay: { enabled: true },
       stacking: {
         template: "stacked_split",
         topHeightPercent: 35,

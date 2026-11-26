@@ -293,7 +293,7 @@ export async function runExportQueue(project: ClipForgeProject) {
 
       const framing = resolveClipFraming(item, project);
       const isShort = framing.isShort;
-      const overlayEnabled = isShort ? false : (project.composition.overlay?.enabled ?? true);
+      const overlayEnabled = project.composition.overlay?.enabled ?? true;
 
       try {
         const res = await renderClip({
@@ -309,7 +309,10 @@ export async function runExportQueue(project: ClipForgeProject) {
           crf: project.export.crf,
           preset: project.export.preset,
           overlay_enabled: overlayEnabled,
-          brand_title: isShort ? undefined : (project.composition.overlay?.brandTitle || "CLYPTIK"),
+          brand_title: overlayEnabled ? (project.composition.overlay?.brandTitle || "CLYPTIK") : undefined,
+          logo_path: overlayEnabled ? project.composition.overlay?.logoPath : undefined,
+          logo_scale: overlayEnabled ? project.composition.overlay?.logoScale : undefined,
+          logo_offset_y: overlayEnabled ? project.composition.overlay?.logoOffsetY : undefined,
           episode_label: isShort ? undefined : (project.composition.overlay?.episodeLabel || "PART"),
           episode_index: isShort ? undefined : item.episodeIndex,
           top_crop_x: framing.top_crop_x,
@@ -400,7 +403,7 @@ export async function renderSingleClip(clip: Clip, project: ClipForgeProject) {
 
   const framing = resolveClipFraming(clip, project);
   const isShort = framing.isShort;
-  const overlayEnabled = isShort ? false : (project.composition.overlay?.enabled ?? true);
+  const overlayEnabled = project.composition.overlay?.enabled ?? true;
 
   let unlisten: (() => void) | null = null;
   try {
@@ -436,7 +439,10 @@ export async function renderSingleClip(clip: Clip, project: ClipForgeProject) {
       crf: project.export.crf,
       preset: project.export.preset,
       overlay_enabled: overlayEnabled,
-      brand_title: isShort ? undefined : (project.composition.overlay?.brandTitle || "CLYPTIK"),
+      brand_title: overlayEnabled ? (project.composition.overlay?.brandTitle || "CLYPTIK") : undefined,
+      logo_path: overlayEnabled ? project.composition.overlay?.logoPath : undefined,
+      logo_scale: overlayEnabled ? project.composition.overlay?.logoScale : undefined,
+      logo_offset_y: overlayEnabled ? project.composition.overlay?.logoOffsetY : undefined,
       episode_label: isShort ? undefined : (project.composition.overlay?.episodeLabel || "PART"),
       episode_index: isShort ? undefined : item.episodeIndex,
       top_crop_x: framing.top_crop_x,
