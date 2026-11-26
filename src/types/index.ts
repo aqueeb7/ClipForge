@@ -39,9 +39,16 @@ export interface GameplaySettings {
 export interface OverlaySettings {
   enabled: boolean;
   brandTitle?: string;
+  titleX?: number; // 0-100% (default 50)
+  titleY?: number; // 0-100% (default 13.5 with logo, 6.5 without)
+  titleFontSize?: number; // px on 1080p canvas, 20-72 (default 36)
   episodeLabel?: string;
+  episodeY?: number; // 0-100% (default 90)
   showEpisodeNumber?: boolean;
   logoPath?: string;
+  logoX?: number; // 0-100% (default 50)
+  logoY?: number; // 0-100% (default 5.5)
+  logoWidth?: number; // 10-90% of frame width (default 45)
   logoScale?: number;
   logoOffsetY?: number;
 }
@@ -259,8 +266,15 @@ export interface RenderClipRequest {
   pan_crop_x?: number;
   top_height_pct?: number;
   logo_path?: string;
+  logo_x?: number;
+  logo_y?: number;
+  logo_width_pct?: number;
   logo_scale?: number;
   logo_offset_y?: number;
+  title_x?: number;
+  title_y?: number;
+  title_font_size?: number;
+  episode_y?: number;
 }
 
 export interface RenderProgressPayload {

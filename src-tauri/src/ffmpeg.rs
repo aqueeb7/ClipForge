@@ -314,10 +314,20 @@ pub fn execute_render_task(
         if let Some(ref brand) = req.brand_title {
             if !brand.trim().is_empty() {
                 let escaped_brand = escape_drawtext(&brand.trim().to_uppercase());
-                let brand_y = if has_logo { 240 } else { 120 };
+                let title_font_size = req.title_font_size.unwrap_or(36).clamp(16, 120);
+                let title_y_pct = req.title_y.unwrap_or(if has_logo { 13.5 } else { 6.5 }).clamp(0.0, 95.0);
+                let title_y_px = ((height as f64) * (title_y_pct / 100.0)).round() as i64;
+                let title_x_pct = req.title_x.unwrap_or(50.0).clamp(0.0, 100.0);
+                let title_x_expr = if (title_x_pct - 50.0).abs() < 1.0 {
+                    "(w-text_w)/2".to_string()
+                } else {
+                    format!("(w*{:.4}-text_w/2)", title_x_pct / 100.0)
+                };
+                let box_border = ((title_font_size as f64) * 0.28).round().max(4.0) as u32;
+
                 overlay_filters.push(format!(
-                    "drawtext={}text='{}':fontcolor=white:fontsize=36:x=(w-text_w)/2:y={}:box=1:boxcolor=black@0.6:boxborderw=10",
-                    font_arg, escaped_brand, brand_y
+                    "drawtext={}text='{}':fontcolor=white:fontsize={}:x='{}':y={}:box=1:boxcolor=black@0.6:boxborderw={}",
+                    font_arg, escaped_brand, title_font_size, title_x_expr, title_y_px, box_border
                 ));
             }
         }
@@ -334,9 +344,11 @@ pub fn execute_render_task(
 
                 if !episode_text.is_empty() {
                     let escaped_ep = escape_drawtext(&episode_text);
+                    let ep_y_pct = req.episode_y.unwrap_or(90.0).clamp(5.0, 95.0);
+                    let ep_y_px = ((height as f64) * (ep_y_pct / 100.0)).round() as i64;
                     overlay_filters.push(format!(
-                        "drawtext={}text='{}':fontcolor=yellow:fontsize=44:x=(w-text_w)/2:y=1720:box=1:boxcolor=black@0.6:boxborderw=10",
-                        font_arg, escaped_ep
+                        "drawtext={}text='{}':fontcolor=yellow:fontsize=44:x=(w-text_w)/2:y={}:box=1:boxcolor=black@0.6:boxborderw=10",
+                        font_arg, escaped_ep, ep_y_px
                     ));
                 }
             }
@@ -400,13 +412,25 @@ pub fn execute_render_task(
     };
 
     let video_filter_graph = if let Some(logo_idx) = logo_input_idx {
-        let logo_y = req.logo_offset_y.unwrap_or(90);
-        let max_w = (720.0 * req.logo_scale.unwrap_or(1.0).clamp(0.3, 2.5)).round() as u32;
+        let logo_w_pct = req.logo_width_pct.unwrap_or(45.0).clamp(10.0, 95.0);
+        let logo_scale = req.logo_scale.unwrap_or(1.0).clamp(0.4, 2.5);
+        let target_w = (((width as f64) * (logo_w_pct / 100.0) * logo_scale).round() as u32).clamp(100, 1040);
+
+        let logo_y_pct = req.logo_y.unwrap_or(req.logo_offset_y.map(|y| (y as f64) / 19.2).unwrap_or(5.5)).clamp(0.0, 95.0);
+        let logo_y_px = ((height as f64) * (logo_y_pct / 100.0)).round() as i64;
+
+        let logo_x_pct = req.logo_x.unwrap_or(50.0).clamp(0.0, 100.0);
+        let logo_x_expr = if (logo_x_pct - 50.0).abs() < 1.0 {
+            "(W-w)/2".to_string()
+        } else {
+            format!("(W*{:.4}-w/2)", logo_x_pct / 100.0)
+        };
+
         format!(
             "{};\
-             [{}:v]scale='min({},iw)':-1:force_original_aspect_ratio=decrease[logo_s];\
-             [base_v][logo_s]overlay=(W-w)/2:{}:eof_action=repeat{},setsar=1,format=yuv420p[vout]",
-            base_graph, logo_idx, max_w, logo_y, overlay_chain
+             [{logo_idx}:v]scale={target_w}:-1:force_original_aspect_ratio=decrease[logo_s];\
+             [base_v][logo_s]overlay='{logo_x_expr}':{logo_y_px}:eof_action=repeat{},setsar=1,format=yuv420p[vout]",
+            base_graph, overlay_chain
         )
     } else {
         format!(

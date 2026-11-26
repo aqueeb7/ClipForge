@@ -599,27 +599,267 @@ export const UnifiedStudioSidebar: Component<UnifiedStudioSidebarProps> = (props
                               </div>
                             </div>
 
-                            {/* Logo Scale Slider */}
-                            <div class="pt-1.5 border-t border-zinc-800/80 space-y-1">
+                            {/* Logo Width & Scale */}
+                            <div class="pt-2 border-t border-zinc-800/80 space-y-2">
+                              <div class="space-y-1">
+                                <div class="flex items-center justify-between text-[10px]">
+                                  <span class="text-zinc-400">Logo Width</span>
+                                  <span class="font-mono text-zinc-300 font-semibold">
+                                    {(composition()?.overlay?.logoWidth ?? 45).toFixed(0)}%
+                                  </span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="15"
+                                  max="85"
+                                  step="1"
+                                  value={composition()?.overlay?.logoWidth ?? 45}
+                                  onInput={(e) => {
+                                    const val = parseFloat((e.target as HTMLInputElement).value);
+                                    projectSignals.updateComposition({
+                                      overlay: {
+                                        ...(composition()?.overlay || {}),
+                                        enabled: true,
+                                        logoWidth: val
+                                      }
+                                    });
+                                  }}
+                                  class="w-full accent-blue-500 cursor-pointer"
+                                />
+                              </div>
+
+                              {/* Logo X (Horizontal) */}
+                              <div class="space-y-1">
+                                <div class="flex items-center justify-between text-[10px]">
+                                  <span class="text-zinc-400">Horizontal (X)</span>
+                                  <span class="font-mono text-zinc-300 font-semibold">
+                                    {(composition()?.overlay?.logoX ?? 50).toFixed(0)}%
+                                  </span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="10"
+                                  max="90"
+                                  step="0.5"
+                                  value={composition()?.overlay?.logoX ?? 50}
+                                  onInput={(e) => {
+                                    const val = parseFloat((e.target as HTMLInputElement).value);
+                                    projectSignals.updateComposition({
+                                      overlay: {
+                                        ...(composition()?.overlay || {}),
+                                        enabled: true,
+                                        logoX: val
+                                      }
+                                    });
+                                  }}
+                                  class="w-full accent-blue-500 cursor-pointer"
+                                />
+                                <div class="grid grid-cols-3 gap-1 pt-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => projectSignals.updateComposition({ overlay: { ...(composition()?.overlay || {}), enabled: true, logoX: 20 } })}
+                                    class="py-0.5 px-1 rounded bg-zinc-900 hover:bg-zinc-800 text-[9px] text-zinc-400 text-center"
+                                  >
+                                    Left (20%)
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => projectSignals.updateComposition({ overlay: { ...(composition()?.overlay || {}), enabled: true, logoX: 50 } })}
+                                    class="py-0.5 px-1 rounded bg-zinc-900 hover:bg-zinc-800 text-[9px] text-zinc-400 text-center"
+                                  >
+                                    Center (50%)
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => projectSignals.updateComposition({ overlay: { ...(composition()?.overlay || {}), enabled: true, logoX: 80 } })}
+                                    class="py-0.5 px-1 rounded bg-zinc-900 hover:bg-zinc-800 text-[9px] text-zinc-400 text-center"
+                                  >
+                                    Right (80%)
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Logo Y (Vertical) */}
+                              <div class="space-y-1">
+                                <div class="flex items-center justify-between text-[10px]">
+                                  <span class="text-zinc-400">Vertical (Y)</span>
+                                  <span class="font-mono text-zinc-300 font-semibold">
+                                    {(composition()?.overlay?.logoY ?? 5.5).toFixed(1)}%
+                                  </span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="1"
+                                  max="85"
+                                  step="0.5"
+                                  value={composition()?.overlay?.logoY ?? 5.5}
+                                  onInput={(e) => {
+                                    const val = parseFloat((e.target as HTMLInputElement).value);
+                                    projectSignals.updateComposition({
+                                      overlay: {
+                                        ...(composition()?.overlay || {}),
+                                        enabled: true,
+                                        logoY: val
+                                      }
+                                    });
+                                  }}
+                                  class="w-full accent-blue-500 cursor-pointer"
+                                />
+                                <div class="grid grid-cols-4 gap-1 pt-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => projectSignals.updateComposition({ overlay: { ...(composition()?.overlay || {}), enabled: true, logoY: 5.5 } })}
+                                    class="py-0.5 px-1 rounded bg-zinc-900 hover:bg-zinc-800 text-[9px] text-zinc-400 text-center"
+                                  >
+                                    Top (5.5%)
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => projectSignals.updateComposition({ overlay: { ...(composition()?.overlay || {}), enabled: true, logoY: 12 } })}
+                                    class="py-0.5 px-1 rounded bg-zinc-900 hover:bg-zinc-800 text-[9px] text-zinc-400 text-center"
+                                  >
+                                    Upper (12%)
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => projectSignals.updateComposition({ overlay: { ...(composition()?.overlay || {}), enabled: true, logoY: 50 } })}
+                                    class="py-0.5 px-1 rounded bg-zinc-900 hover:bg-zinc-800 text-[9px] text-zinc-400 text-center"
+                                  >
+                                    Mid (50%)
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => projectSignals.updateComposition({ overlay: { ...(composition()?.overlay || {}), enabled: true, logoY: 82 } })}
+                                    class="py-0.5 px-1 rounded bg-zinc-900 hover:bg-zinc-800 text-[9px] text-zinc-400 text-center"
+                                  >
+                                    Bot (82%)
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </Show>
+                      </div>
+
+                      <div class="space-y-2 pt-1 border-t border-zinc-800/60">
+                        <div>
+                          <span class="text-[10px] text-zinc-400 block mb-1">Header Brand Title (Text)</span>
+                          <input
+                            type="text"
+                            placeholder="e.g. CLYPTIK (or leave empty if using PNG only)"
+                            value={composition()?.overlay?.brandTitle || ""}
+                            onInput={(e) =>
+                              projectSignals.updateComposition({
+                                overlay: {
+                                  ...(composition()?.overlay || { enabled: true, episodeLabel: "PART" }),
+                                  brandTitle: (e.target as HTMLInputElement).value
+                                }
+                              })
+                            }
+                            class="w-full px-2.5 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-xs text-zinc-100 outline-none placeholder:text-zinc-500"
+                          />
+                        </div>
+
+                        <Show when={composition()?.overlay?.brandTitle}>
+                          {/* Title Font Size & Placement Controls */}
+                          <div class="p-2.5 rounded-lg bg-zinc-950 border border-zinc-800 space-y-2">
+                            <div class="space-y-1">
                               <div class="flex items-center justify-between text-[10px]">
-                                <span class="text-zinc-400">Logo Size</span>
+                                <span class="text-zinc-400">Title Font Size</span>
                                 <span class="font-mono text-zinc-300 font-semibold">
-                                  {Math.round((composition()?.overlay?.logoScale || 1.0) * 100)}%
+                                  {composition()?.overlay?.titleFontSize ?? 36}px
                                 </span>
                               </div>
                               <input
                                 type="range"
-                                min="0.5"
-                                max="1.6"
-                                step="0.05"
-                                value={composition()?.overlay?.logoScale || 1.0}
+                                min="20"
+                                max="64"
+                                step="2"
+                                value={composition()?.overlay?.titleFontSize ?? 36}
+                                onInput={(e) => {
+                                  const val = parseInt((e.target as HTMLInputElement).value, 10);
+                                  projectSignals.updateComposition({
+                                    overlay: {
+                                      ...(composition()?.overlay || {}),
+                                      enabled: true,
+                                      titleFontSize: val
+                                    }
+                                  });
+                                }}
+                                class="w-full accent-blue-500 cursor-pointer"
+                              />
+                            </div>
+
+                            <div class="space-y-1">
+                              <div class="flex items-center justify-between text-[10px]">
+                                <span class="text-zinc-400">Title Vertical (Y)</span>
+                                <span class="font-mono text-zinc-300 font-semibold">
+                                  {(composition()?.overlay?.titleY ?? (composition()?.overlay?.logoPath ? 13.5 : 6.5)).toFixed(1)}%
+                                </span>
+                              </div>
+                              <input
+                                type="range"
+                                min="1"
+                                max="85"
+                                step="0.5"
+                                value={composition()?.overlay?.titleY ?? (composition()?.overlay?.logoPath ? 13.5 : 6.5)}
                                 onInput={(e) => {
                                   const val = parseFloat((e.target as HTMLInputElement).value);
                                   projectSignals.updateComposition({
                                     overlay: {
                                       ...(composition()?.overlay || {}),
                                       enabled: true,
-                                      logoScale: val
+                                      titleY: val
+                                    }
+                                  });
+                                }}
+                                class="w-full accent-blue-500 cursor-pointer"
+                              />
+                              <div class="grid grid-cols-3 gap-1 pt-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => projectSignals.updateComposition({ overlay: { ...(composition()?.overlay || {}), enabled: true, titleY: 6.5 } })}
+                                  class="py-0.5 px-1 rounded bg-zinc-900 hover:bg-zinc-800 text-[9px] text-zinc-400 text-center"
+                                >
+                                  Top (6.5%)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => projectSignals.updateComposition({ overlay: { ...(composition()?.overlay || {}), enabled: true, titleY: 13.5 } })}
+                                  class="py-0.5 px-1 rounded bg-zinc-900 hover:bg-zinc-800 text-[9px] text-zinc-400 text-center"
+                                >
+                                  Sub (13.5%)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => projectSignals.updateComposition({ overlay: { ...(composition()?.overlay || {}), enabled: true, titleY: 50 } })}
+                                  class="py-0.5 px-1 rounded bg-zinc-900 hover:bg-zinc-800 text-[9px] text-zinc-400 text-center"
+                                >
+                                  Mid (50%)
+                                </button>
+                              </div>
+                            </div>
+
+                            <div class="space-y-1">
+                              <div class="flex items-center justify-between text-[10px]">
+                                <span class="text-zinc-400">Title Horizontal (X)</span>
+                                <span class="font-mono text-zinc-300 font-semibold">
+                                  {(composition()?.overlay?.titleX ?? 50).toFixed(0)}%
+                                </span>
+                              </div>
+                              <input
+                                type="range"
+                                min="10"
+                                max="90"
+                                step="0.5"
+                                value={composition()?.overlay?.titleX ?? 50}
+                                onInput={(e) => {
+                                  const val = parseFloat((e.target as HTMLInputElement).value);
+                                  projectSignals.updateComposition({
+                                    overlay: {
+                                      ...(composition()?.overlay || {}),
+                                      enabled: true,
+                                      titleX: val
                                     }
                                   });
                                 }}
@@ -630,38 +870,55 @@ export const UnifiedStudioSidebar: Component<UnifiedStudioSidebarProps> = (props
                         </Show>
                       </div>
 
-                      <div>
-                        <span class="text-[10px] text-zinc-400 block mb-1">Header Brand Title (Text)</span>
-                        <input
-                          type="text"
-                          placeholder="e.g. CLYPTIK (or leave empty if using PNG only)"
-                          value={composition()?.overlay?.brandTitle || ""}
-                          onInput={(e) =>
-                            projectSignals.updateComposition({
-                              overlay: {
-                                ...(composition()?.overlay || { enabled: true, episodeLabel: "PART" }),
-                                brandTitle: (e.target as HTMLInputElement).value
-                              }
-                            })
-                          }
-                          class="w-full px-2.5 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-xs text-zinc-100 outline-none placeholder:text-zinc-500"
-                        />
+                      <div class="space-y-2 pt-1 border-t border-zinc-800/60">
+                        <div>
+                          <span class="text-[10px] text-zinc-400 block mb-1">Episodic Tag (Full Stream Parts only)</span>
+                          <input
+                            type="text"
+                            value={composition()?.overlay?.episodeLabel || "PART"}
+                            onInput={(e) =>
+                              projectSignals.updateComposition({
+                                overlay: {
+                                  ...(composition()?.overlay || { enabled: true, brandTitle: "CLYPTIK" }),
+                                  episodeLabel: (e.target as HTMLInputElement).value
+                                }
+                              })
+                            }
+                            class="w-full px-2.5 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-xs text-zinc-100 outline-none"
+                          />
+                        </div>
+
+                        <div class="space-y-1">
+                          <div class="flex items-center justify-between text-[10px]">
+                            <span class="text-zinc-400">Episode Tag Vertical (Y)</span>
+                            <span class="font-mono text-zinc-300 font-semibold">
+                              {(composition()?.overlay?.episodeY ?? 90).toFixed(0)}%
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="60"
+                            max="96"
+                            step="0.5"
+                            value={composition()?.overlay?.episodeY ?? 90}
+                            onInput={(e) => {
+                              const val = parseFloat((e.target as HTMLInputElement).value);
+                              projectSignals.updateComposition({
+                                overlay: {
+                                  ...(composition()?.overlay || {}),
+                                  enabled: true,
+                                  episodeY: val
+                                }
+                              });
+                            }}
+                            class="w-full accent-blue-500 cursor-pointer"
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <span class="text-[10px] text-zinc-400 block mb-1">Episodic Tag (Full Stream Parts only)</span>
-                        <input
-                          type="text"
-                          value={composition()?.overlay?.episodeLabel || "PART"}
-                          onInput={(e) =>
-                            projectSignals.updateComposition({
-                              overlay: {
-                                ...(composition()?.overlay || { enabled: true, brandTitle: "CLYPTIK" }),
-                                episodeLabel: (e.target as HTMLInputElement).value
-                              }
-                            })
-                          }
-                          class="w-full px-2.5 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-xs text-zinc-100 outline-none"
-                        />
+
+                      <div class="pt-1 text-[9px] text-zinc-500 bg-zinc-900/50 p-2 rounded border border-zinc-800/60 leading-relaxed">
+                        <span class="text-blue-400 font-bold block mb-0.5">💡 Interactive Live Placement</span>
+                        You can drag the Logo, Title, or Episode tag directly on the 9:16 vertical video preview. The preview and final render are mathematically 1:1 identical.
                       </div>
                     </div>
                   </Show>

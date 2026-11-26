@@ -25,6 +25,7 @@ export const VideoPreview: Component = () => {
   let wideCanvasRef: HTMLDivElement | undefined;
   let verticalCanvasRef: HTMLCanvasElement | undefined;
   let overlayContainerRef: HTMLDivElement | undefined;
+  let verticalContainerRef: HTMLDivElement | undefined;
   let animationFrameId: number | null = null;
 
   const [videoLoadError, setVideoLoadError] = createSignal<string | null>(null);
@@ -32,6 +33,7 @@ export const VideoPreview: Component = () => {
   const [volume, setVolume] = createSignal(1.0);
   const [activeZone, setActiveZone] = createSignal<"top" | "bottom" | "pan">("top");
   const [showCropControls, setShowCropControls] = createSignal(true);
+  const [isDraggingOverlay, setIsDraggingOverlay] = createSignal<"logo" | "title" | "episode" | null>(null);
 
   type DragMode =
     | "move"
@@ -411,6 +413,73 @@ export const VideoPreview: Component = () => {
         stacking: { topRegion: { x: 0, y: 0, width: 100, height: 45 } }
       });
     }
+  }
+
+  function handleStartOverlayDrag(target: "logo" | "title" | "episode", e: MouseEvent) {
+    e.stopPropagation();
+    e.preventDefault();
+    const container = verticalContainerRef;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const initialOverlay = composition()?.overlay || { enabled: true };
+    const initX = target === "logo"
+      ? (initialOverlay.logoX ?? 50)
+      : target === "title"
+      ? (initialOverlay.titleX ?? 50)
+      : 50;
+    const initY = target === "logo"
+      ? (initialOverlay.logoY ?? 5.5)
+      : target === "title"
+      ? (initialOverlay.titleY ?? (initialOverlay.logoPath ? 13.5 : 6.5))
+      : (initialOverlay.episodeY ?? 90);
+
+    setIsDraggingOverlay(target);
+
+    function onMouseMove(ev: MouseEvent) {
+      const deltaX = ((ev.clientX - startX) / rect.width) * 100;
+      const deltaY = ((ev.clientY - startY) / rect.height) * 100;
+      const newX = Math.round(Math.max(5, Math.min(95, initX + deltaX)) * 10) / 10;
+      const newY = Math.round(Math.max(1, Math.min(96, initY + deltaY)) * 10) / 10;
+
+      if (target === "logo") {
+        projectSignals.updateComposition({
+          overlay: {
+            ...initialOverlay,
+            enabled: true,
+            logoX: newX,
+            logoY: newY
+          }
+        });
+      } else if (target === "title") {
+        projectSignals.updateComposition({
+          overlay: {
+            ...initialOverlay,
+            enabled: true,
+            titleX: newX,
+            titleY: newY
+          }
+        });
+      } else {
+        projectSignals.updateComposition({
+          overlay: {
+            ...initialOverlay,
+            enabled: true,
+            episodeY: newY
+          }
+        });
+      }
+    }
+
+    function onMouseUp() {
+      setIsDraggingOverlay(null);
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    }
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
   }
 
   function handleCreateCustomShort() {
@@ -968,7 +1037,8 @@ export const VideoPreview: Component = () => {
         {/* ==================== VIEW 2: 9:16 VERTICAL SIMULATED OUTCOME ==================== */}
         <Show when={viewMode() === "vertical" || viewMode() === "dual"}>
           <div
-            class="relative h-full aspect-[9/16] bg-zinc-950 rounded-lg overflow-hidden border border-zinc-800/90 shadow-2xl flex flex-col justify-between items-center cursor-pointer shrink-0"
+            ref={verticalContainerRef}
+            class="relative h-full aspect-[9/16] bg-zinc-950 rounded-lg overflow-hidden border border-zinc-800/90 shadow-2xl flex flex-col justify-between items-center cursor-pointer shrink-0 [container-type:inline-size]"
             onClick={togglePlayback}
           >
             {/* Single High-Performance GPU Canvas Blit (Zero Extra Decoders) */}
@@ -995,38 +1065,102 @@ export const VideoPreview: Component = () => {
               </div>
             </Show>
 
-            {/* Overlays: Top Brand Title & Heading Logo */}
-            <div class="relative z-20 pt-2.5 px-3 text-center pointer-events-none w-full flex flex-col items-center gap-1">
-              <Show when={composition()?.overlay?.enabled}>
+            {/* Interactive WYSIWYG Overlays Layer (1:1 Match With FFmpeg) */}
+            <Show when={composition()?.overlay?.enabled}>
+              <div class="absolute inset-0 pointer-events-none z-20 overflow-hidden">
+                {/* PNG Logo Overlay */}
                 <Show when={composition()?.overlay?.logoPath && logoAssetUrl()}>
-                  <div class="max-w-[85%] flex items-center justify-center">
+                  <div
+                    class={`absolute pointer-events-auto cursor-move select-none group transition-shadow ${
+                      isDraggingOverlay() === "logo" ? "ring-2 ring-blue-400 shadow-xl" : "hover:ring-1 hover:ring-blue-400/60"
+                    }`}
+                    style={{
+                      left: `${composition()?.overlay?.logoX ?? 50}%`,
+                      top: `${composition()?.overlay?.logoY ?? 5.5}%`,
+                      width: `${(composition()?.overlay?.logoWidth ?? 45) * (composition()?.overlay?.logoScale ?? 1.0)}%`,
+                      transform: "translate(-50%, 0)",
+                    }}
+                    onMouseDown={(e) => handleStartOverlayDrag("logo", e)}
+                    title="Click and drag to reposition Logo (Matches final render)"
+                  >
                     <img
                       src={logoAssetUrl()!}
                       alt="Heading Logo"
-                      class="object-contain drop-shadow-md select-none transition-all"
-                      style={{
-                        "max-height": `${Math.round(48 * (composition()?.overlay?.logoScale || 1.0))}px`,
-                        "max-width": `${Math.round(260 * (composition()?.overlay?.logoScale || 1.0))}px`,
-                      }}
+                      class="w-full h-auto object-contain select-none pointer-events-none drop-shadow-md"
                     />
+                    {/* Live Drag Coordinate Pill */}
+                    <div class="absolute -top-4 left-1/2 -translate-x-1/2 px-1 py-0.2 bg-black/90 text-blue-300 font-mono text-[8px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                      X:{(composition()?.overlay?.logoX ?? 50).toFixed(0)}% Y:{(composition()?.overlay?.logoY ?? 5.5).toFixed(1)}%
+                    </div>
                   </div>
                 </Show>
-                <Show when={composition()?.overlay?.brandTitle}>
-                  <span class="inline-block px-2 py-0.5 bg-black/80 text-white text-[9px] font-black uppercase tracking-widest rounded border border-white/20 backdrop-blur shadow-sm">
-                    {composition()?.overlay?.brandTitle}
-                  </span>
-                </Show>
-              </Show>
-            </div>
 
-            {/* Overlays: Bottom Episode Label */}
-            <div class="relative z-20 pb-2 px-2 text-center pointer-events-none w-full">
-              <Show when={composition()?.overlay?.enabled && composition()?.overlay?.episodeLabel}>
-                <span class="inline-block px-2.5 py-0.5 bg-black/85 text-amber-400 font-mono font-black text-[10px] tracking-wider uppercase rounded border border-amber-400/30 backdrop-blur shadow-sm">
-                  {composition()?.overlay?.episodeLabel} 001
-                </span>
-              </Show>
-            </div>
+                {/* Brand Title Text Overlay */}
+                <Show when={composition()?.overlay?.brandTitle}>
+                  <div
+                    class={`absolute pointer-events-auto cursor-move select-none group transition-shadow ${
+                      isDraggingOverlay() === "title" ? "ring-2 ring-amber-400 shadow-xl" : "hover:ring-1 hover:ring-amber-400/60"
+                    }`}
+                    style={{
+                      left: `${composition()?.overlay?.titleX ?? 50}%`,
+                      top: `${composition()?.overlay?.titleY ?? (composition()?.overlay?.logoPath ? 13.5 : 6.5)}%`,
+                      transform: "translate(-50%, 0)",
+                    }}
+                    onMouseDown={(e) => handleStartOverlayDrag("title", e)}
+                    title="Click and drag to reposition Title (Matches final render)"
+                  >
+                    <span
+                      class="inline-block font-black uppercase tracking-widest text-white whitespace-nowrap shadow-sm text-center"
+                      style={{
+                        "font-size": `${((composition()?.overlay?.titleFontSize ?? 36) / 1080) * 100}cqw`,
+                        "line-height": 1.2,
+                        "padding": `${((((composition()?.overlay?.titleFontSize ?? 36) * 0.28) / 1080) * 100).toFixed(2)}cqw ${((18 / 1080) * 100).toFixed(2)}cqw`,
+                        "background-color": "rgba(0, 0, 0, 0.6)",
+                        "border-radius": "2px",
+                      }}
+                    >
+                      {composition()?.overlay?.brandTitle}
+                    </span>
+                    {/* Live Drag Coordinate Pill */}
+                    <div class="absolute -top-4 left-1/2 -translate-x-1/2 px-1 py-0.2 bg-black/90 text-amber-300 font-mono text-[8px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                      X:{(composition()?.overlay?.titleX ?? 50).toFixed(0)}% Y:{(composition()?.overlay?.titleY ?? (composition()?.overlay?.logoPath ? 13.5 : 6.5)).toFixed(1)}%
+                    </div>
+                  </div>
+                </Show>
+
+                {/* Bottom Episode Label */}
+                <Show when={composition()?.overlay?.episodeLabel}>
+                  <div
+                    class={`absolute pointer-events-auto cursor-move select-none group transition-shadow ${
+                      isDraggingOverlay() === "episode" ? "ring-2 ring-yellow-400 shadow-xl" : "hover:ring-1 hover:ring-yellow-400/60"
+                    }`}
+                    style={{
+                      left: "50%",
+                      top: `${composition()?.overlay?.episodeY ?? 90}%`,
+                      transform: "translate(-50%, 0)",
+                    }}
+                    onMouseDown={(e) => handleStartOverlayDrag("episode", e)}
+                    title="Click and drag to reposition Episode Tag"
+                  >
+                    <span
+                      class="inline-block font-black font-mono tracking-wider uppercase text-yellow-400 whitespace-nowrap shadow-sm text-center"
+                      style={{
+                        "font-size": `${(44 / 1080) * 100}cqw`,
+                        "line-height": 1.2,
+                        "padding": `${((10 / 1080) * 100).toFixed(2)}cqw ${((20 / 1080) * 100).toFixed(2)}cqw`,
+                        "background-color": "rgba(0, 0, 0, 0.6)",
+                        "border-radius": "2px",
+                      }}
+                    >
+                      {composition()?.overlay?.episodeLabel} 001
+                    </span>
+                    <div class="absolute -top-4 left-1/2 -translate-x-1/2 px-1 py-0.2 bg-black/90 text-yellow-300 font-mono text-[8px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                      Y:{(composition()?.overlay?.episodeY ?? 90).toFixed(1)}%
+                    </div>
+                  </div>
+                </Show>
+              </div>
+            </Show>
 
             {/* Vertical Indicator Pill */}
             <div class="absolute right-2 top-2 px-1.5 py-0.2 rounded bg-blue-600/80 text-white font-mono text-[8px] font-bold uppercase tracking-wider z-20 pointer-events-none">
